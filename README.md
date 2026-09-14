@@ -53,7 +53,7 @@ Start the dashboard once and leave it running. Tabs stay live while Claude
 Code sessions come and go:
 
 ```sh
-npm run dashboard         # http://localhost:5199/
+npm run dashboard         # http://localhost:5199/  (PORT=... to change it)
 ```
 
 ## Use
