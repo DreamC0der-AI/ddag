@@ -116,7 +116,7 @@ See DOCTRINE.md, "Auditing with the Graph".
 
 ### Projects
 
-![Projects page: every registered chain with its standing](docs/screenshots/home.png)
+![Projects page: every registered chain with its standing](docs/screenshots/projects.png)
 
 `http://localhost:5199/` lists every registered project: root solid or
 broken, latest version and the commit it sits on, event count, frontier size,
