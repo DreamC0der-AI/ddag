@@ -112,6 +112,13 @@ the protocol in the tool's instructions:
 
 See DOCTRINE.md, "Auditing with the Graph".
 
+A target that ships carries two standing parts besides its build, pending
+from the day it is decomposed: the audit above, and a **walkthrough**, "a new
+user with only the README can do everything the README says", settled by a
+tester session that has no source access and uses only the real interface.
+Until both are judged, the root says "built", not "done". DOCTRINE.md, "What
+a Shipped Target Rests On".
+
 ## The dashboard
 
 ### Projects
