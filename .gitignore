@@ -7,3 +7,4 @@ dist/
 ddag.json
 testcases/
 testbed/
+.DS_Store
