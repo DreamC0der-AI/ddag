@@ -9,7 +9,7 @@ export default defineConfig({
     emptyOutDir: false,
     rollupOptions: {
       input: 'src/mcp/main.ts',
-      output: { entryFileNames: 'ddag-mcp.mjs', format: 'es' },
+      output: { entryFileNames: 'ddag-mcp.mjs', format: 'es', banner: '#!/usr/bin/env node' },
     },
   },
   ssr: { noExternal: true },

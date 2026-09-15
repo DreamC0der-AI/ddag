@@ -1,13 +1,48 @@
 {
-  "name": "ddag",
-  "private": true,
-  "version": "0.1.0",
+  "name": "@dreamc0der/ddag",
+  "version": "0.3.0",
+  "description": "Decompose DAG: an epistemic scaffold for vibe coding. A claims graph the agent must verify bottom-up with evidence, an MCP server for agents, a live dashboard for humans.",
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "claude",
+    "claude-code",
+    "agent",
+    "verification",
+    "audit",
+    "epistemic",
+    "decomposition",
+    "dag"
+  ],
   "license": "MIT",
+  "author": {
+    "name": "dream coder",
+    "url": "https://github.com/DreamC0der-AI"
+  },
+  "homepage": "https://github.com/DreamC0der-AI/ddag#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/DreamC0der-AI/ddag.git"
+    "url": "git+https://github.com/DreamC0der-AI/ddag.git"
+  },
+  "bugs": {
+    "url": "https://github.com/DreamC0der-AI/ddag/issues"
   },
   "type": "module",
+  "bin": {
+    "ddag": "dist/ddag-mcp.mjs",
+    "ddag-dashboard": "dist/ddag-dashboard.mjs"
+  },
+  "files": [
+    "dist/ddag-mcp.mjs",
+    "dist/ddag-dashboard.mjs",
+    "dist/dashboard",
+    "DESIGN.md",
+    "DOCTRINE.md",
+    "ALGORITHMS.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -17,25 +52,27 @@
     "test:watch": "vitest",
     "build:mcp": "vite build --config vite.mcp.config.ts",
     "build:dashboard": "vite build && vite build --config vite.dashboard.config.ts",
-    "dashboard": "node dist/ddag-dashboard.mjs"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.30.0",
-    "@xyflow/react": "^12.11.2",
-    "d3-force": "^3.0.0",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
-    "zod": "^4.6.2"
+    "dashboard": "node dist/ddag-dashboard.mjs",
+    "prepublishOnly": "npm run build:mcp && npm run build:dashboard"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@types/d3-force": "^3.0.10",
     "@types/node": "^22.20.2",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.0.5",
+    "@xyflow/react": "^12.11.2",
+    "d3-force": "^3.0.0",
     "fast-check": "^4.9.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "typescript": "^7.0.2",
     "vite": "^8.2.1",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "zod": "^4.6.2"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

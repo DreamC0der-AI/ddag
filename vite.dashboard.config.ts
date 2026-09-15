@@ -9,7 +9,7 @@ export default defineConfig({
     emptyOutDir: false,
     rollupOptions: {
       input: 'src/dashboard/main.ts',
-      output: { entryFileNames: 'ddag-dashboard.mjs', format: 'es' },
+      output: { entryFileNames: 'ddag-dashboard.mjs', format: 'es', banner: '#!/usr/bin/env node' },
     },
   },
   ssr: { noExternal: true },

@@ -31,8 +31,26 @@ deterministically, so the process itself can be read back.
 
 ## Install
 
-Requires Node.js 22 or later, git, and [Claude Code](https://claude.com/claude-code)
-(any MCP client works; the instructions below are for Claude Code).
+Requires Node.js 22 or later and git. With [Claude Code](https://claude.com/claude-code):
+
+```sh
+claude mcp add --scope user ddag -- npx -y @dreamc0der/ddag
+```
+
+That is the whole setup. The server runs from the folder Claude Code is
+opened in and uses `./ddag.json` there. The first time it runs it also starts
+the dashboard at http://localhost:5199/ as a detached local process, which
+keeps running while sessions come and go. To start or restart it by hand:
+
+```sh
+npx -p @dreamc0der/ddag ddag-dashboard   # PORT=... to change the port; DDAG_NO_DASHBOARD=1 stops the auto-start
+```
+
+Any other MCP client works the same way: the command is `npx -y @dreamc0der/ddag`, the
+transport is stdio. The package on npm, `@dreamc0der/ddag`, is only the two built bundles and the
+three design documents.
+
+To work from source instead:
 
 ```sh
 git clone https://github.com/DreamC0der-AI/ddag.git
@@ -40,21 +58,18 @@ cd ddag
 npm install
 npm run build:mcp         # dist/ddag-mcp.mjs        — the agent tool
 npm run build:dashboard   # dist/ddag-dashboard.mjs  — the human view
-```
-
-Register the tool once, with no chain argument. It uses `./ddag.json` in
-whatever folder Claude Code is opened in:
-
-```sh
 claude mcp add --scope user ddag -- node /absolute/path/to/ddag/dist/ddag-mcp.mjs
+npm run dashboard
 ```
 
-Start the dashboard once and leave it running. Tabs stay live while Claude
-Code sessions come and go:
+### Privacy
 
-```sh
-npm run dashboard         # http://localhost:5199/  (PORT=... to change it)
-```
+Everything stays on your machine. The server reads and writes the project
+folder it runs in (the chain file, git metadata and hashes of the files a
+judgment cites) and a registry of project paths under `~/.ddag/`. The
+dashboard binds to localhost, is read-only, and serves only registered chain
+paths. Nothing is sent anywhere; there is no telemetry and no network access
+beyond the loopback interface.
 
 ## Use
 

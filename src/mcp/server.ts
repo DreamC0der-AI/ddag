@@ -1,4 +1,8 @@
-import { resolve } from 'node:path'
+import { spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { createConnection } from 'node:net'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
@@ -97,6 +101,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
   server.registerTool(
     'add',
     {
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
       title: 'Add — articulate a new sub-task',
       description:
         'Create a new claim as a part of an existing node (arc new->successor). Use when a claim is too large to verify directly, or a new requirement must go on the record. The successor and its valid ancestors reopen (pending) — that is the meaning of decomposing, not a side effect. Do not add a duplicate of an existing claim (use link to reuse it). Omit id to auto-mint one.',
@@ -119,6 +124,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
   server.registerTool(
     'link',
     {
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
       title: 'Link — reuse an existing claim as a part',
       description:
         'Declare that b rests on the already-tracked claim a (arc a->b). Prefer over re-articulating duplicates: one verification then serves every parent. Rejected if it would create a cycle (circular justification). b and its valid ancestors reopen. A reused part that is already solid brings instant progress.',
@@ -134,6 +140,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
   server.registerTool(
     'unlink',
     {
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
       title: 'Unlink — withdraw support',
       description:
         'Remove arc a->b: b no longer rests on a. The strictest reset — a premise was revoked. Nodes losing their last path to root drop, cascading (exclusive subtrees vanish; shared survivors are untouched). Never unlink to hide a real code dependence — an undeclared dependence is the one unsoundness the graph cannot warn about. Pruning a superfluous part is: unlink, then verify(b) to confirm.',
@@ -149,6 +156,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
   server.registerTool(
     'mutate',
     {
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
       title: 'Mutate — the claim now reads differently',
       description:
         'Replace a node\'s claim text. Its verdict resets unconditionally and every valid ancestor reopens; direct successors will need fresh verification, higher ancestors become restorable. Use for real restatements only — for "evidence went stale but the claim is unchanged" use doubt; to undo a restatement use revert.',
@@ -166,6 +174,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
   server.registerTool(
     'verify',
     {
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
       title: 'Verify — submit a judgment',
       description:
         'Record the outcome of actually examining a claim against evidence (tests, code, argument) — never bookkeeping. The evidence citation is REQUIRED (doctrine hook P2) and is recorded on the chain event as the judgment\'s grounds — cite what was actually examined ("vitest run testbed: 16 passed", "reviewed against CommonMark §4.1"). Only frontier nodes (all parts solid, verdict pending/invalid) are verifiable. Before submitting, audit the parts: real, load-bearing, complete. Record invalid honestly — red is information. A valid result may Restore a chain of ancestors for free. WRITE THE EVIDENCE FOR A READER WHO WAS NOT THERE: first sentence = what was examined and what it showed, in plain words; then the numbers; cite file paths (they pin the judgment). No private shorthand, version tags, or doctrine labels.',
@@ -209,6 +218,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
   server.registerTool(
     'refute',
     {
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
       title: 'Refute — withdraw a valid claim shown false',
       description:
         'The mirror of reverify: a finding (an audit, a failing test, a review) has shown a valid claim false. One call withdraws the judgment and records the refutation — Doubt then Verify(invalid) under the label Refute(a) — with the finding as evidence and its pin. Ancestors reopen and stay reopened until the claim is repaired and re-judged. Record the finding itself with issue_open as well, so it has a lifecycle. For a claim that is pending or already invalid, use verify.',
@@ -232,6 +242,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
   server.registerTool(
     'restructure',
     {
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
       title: 'Restructure — give a topic-shaped claim its property parts',
       description:
         'Step 0 of the audit protocol in one call: under a claim that was decomposed by topic ("crypto is sound"), add the PROPERTY claims it stands for ("a revoked device cannot read the vault"), each with a Verify: that names the method that settles it. The topic becomes a group resting on its parts and reopens until they are judged. All-or-nothing: refused before anything is written if the node is missing or a part id exists. Findings then land on the properties, never on the topic.',
@@ -265,6 +276,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
   server.registerTool(
     'reverify',
     {
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
       title: 'Reverify — re-judge a valid claim on today\'s evidence',
       description:
         'For a valid claim whose evidence has aged (graph_audit or the standing line says its artifacts changed) while the claim itself still holds: one call withdraws the old judgment and records a fresh one with new evidence and a new pin — Doubt then Verify under the label Reverify(a). Ancestors reopen and restore within the same call. Not for a claim you now think is wrong: doubt it, then verify it invalid. Evidence is required and is written for a reader who was not there, like any verify.',
@@ -288,6 +300,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
   server.registerTool(
     'doubt',
     {
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
       title: 'Doubt — withdraw a judgment',
       description:
         'The honest reopening of a valid node whose evidence went stale (code drifted, tests aged) while the claim itself is unchanged. Verdict returns to pending and the fingerprint is cleared — nothing can resurrect the withdrawn judgment; re-examination is the only way forward. Ancestors reopen but stay restorable: a confirmed doubt costs exactly one re-verification. To declare a claim wrong: doubt, then verify invalid. Optionally cite why the old evidence is no longer trusted — recorded on the chain.',
@@ -302,6 +315,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
   server.registerTool(
     'revert',
     {
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
       title: 'Revert — back to the verified claim',
       description:
         'Restore a node\'s content to the text it carried at its last valid verification (recovered from the chain). Use when a restatement did not pan out — it asserts "the old claim was right", not "I prefer the old color". If structure is unchanged the verdict restores instantly and may cascade.',
@@ -316,6 +330,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
   server.registerTool(
     'discard',
     {
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
       title: 'Discard — abandon a line of work',
       description:
         'Unlink every out-arc of a node: it and its exclusive subtree drop; shared survivors keep their verdicts untouched. Check the blast first. Nothing is lost from the recorded history — discard prunes the present, not the past.',
@@ -330,6 +345,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
   server.registerTool(
     'substitute',
     {
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
       title: 'Substitute — swap a justification',
       description:
         'y rests on z instead of x, as one decision: link z->y then unlink x->y (link first keeps y connected; an illegal swap aborts whole). y reopens; x drops if exclusive. Swapping back to identical content later is free (Restore) — substitution is a reversible experiment.',
@@ -346,6 +362,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
   server.registerTool(
     'merge',
     {
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
       title: 'Merge — these are the same claim',
       description:
         'Canon takes over every role of dup, then dup is discarded. Merge duplicates EARLY — the cost (reopened parents) only grows as both copies accumulate trust. The sameness belief is audited, not trusted: every affected parent reopens and is re-judged against canon. When in doubt whether two claims are really the same, they are not.',
@@ -361,6 +378,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
   server.registerTool(
     'graph_state',
     {
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
       title: 'Graph state',
       description:
         'Full report: every node (verdict, solidity, claim, parts, fingerprint status), root standing, and the frontier — the complete worklist of what can be verified right now.',
@@ -372,6 +390,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
   server.registerTool(
     'graph_audit',
     {
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
       title: 'Evidence audit — which judgments rest on changed code?',
       description:
         'For every valid node, re-hash the artifacts its judgment was pinned to at verification (git HEAD + cited files/directories) and report the ones that changed or vanished since. Fingerprints cover claims and parts, never code — this is the only signal that a green node\'s evidence was gathered against code that no longer exists. Run it after any change under verified claims; a STALE? line is the prompt for doubt, not a refutation.',
@@ -383,6 +402,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
   server.registerTool(
     'issue_open',
     {
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
       title: 'Record a finding',
       description:
         'Open an issue: a finding from an audit, a review or a failing check, recorded on the chain with its full detail so it is visible on the dashboard\'s issue pane and to every later session. Not a node — a bug is not a part of correctness — and not a judgment: the graph is unchanged. Name the claim it concerns with `node` when there is one; judge that claim invalid separately if the finding refutes it. Give the finding its own key (AUTHZ-1) or let one be assigned (I7).',
@@ -408,6 +428,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
   server.registerTool(
     'issue_close',
     {
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
       title: 'Close an issue',
       description:
         'Close a recorded issue with its outcome — fixed (say what changed and how it was checked), wontfix (say why it is accepted), invalid (the finding was wrong), or duplicate (name the surviving key). Closing an issue does not judge any claim: if a fix makes a refuted claim true again, verify that claim valid as well.',
@@ -427,6 +448,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
   server.registerTool(
     'issue_list',
     {
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
       title: 'Issues — recorded findings and their state',
       description:
         'Every issue recorded on the chain, open first: key, status, severity, the claim it concerns, title. Pass `detail` to include each finding\'s full text, or `key` for one issue in full. Open issues are the worklist a fixing session starts from.',
@@ -443,6 +465,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
   server.registerTool(
     'version_mark',
     {
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
       title: 'Mark a version',
       description:
         'Declare that the project, as of a commit, is a working version with a name (v0.3). Git knows commits but not which one concluded a version; this records it on the chain. The commit is read from the project\'s repository unless given; marking on a tree with uncommitted changes is allowed but warned, because then the commit alone does not identify the code — the clean order is: commit the working version, then mark it (the mark itself lands in the next commit). What the version was (root solid or broken, open issues) is read from the chain at the mark, never stored. A record: the graph is unchanged.',
@@ -474,6 +497,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
   server.registerTool(
     'version_list',
     {
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
       title: 'Versions — when the project was a working version',
       description: 'Every version marked on the chain, newest first, with the commit it sits after, what the chain said of it at that moment (root solid or broken, open issues) and how many events have happened since.',
       inputSchema: {},
@@ -484,6 +508,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
   server.registerTool(
     'graph_history',
     {
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
       title: 'Graph history',
       description:
         'The event chain (most recent events): every applied operation in notation, with epistemic-operation markers. The chain is append-only, replayable history — decisions and their expansions.',
@@ -499,6 +524,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
   server.registerTool(
     'graph_open',
     {
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
       title: 'Open a chain file',
       description:
         "Point the server at another project's chain file without restarting — runtime project switching. The path resolves against the server's working directory and must stay inside it. Opening a path with no existing file starts a fresh graph there (written on the first applied operation).",
@@ -526,6 +552,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
   server.registerTool(
     'graph_new',
     {
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
       title: 'New graph',
       description:
         'Start a fresh graph with the given build target as root, REPLACING the current graph and its history file. Use only when beginning a genuinely new decomposition.',
@@ -563,4 +590,29 @@ export async function main(): Promise<void> {
   await server.connect(new StdioServerTransport())
   // stdout is the protocol channel — boot notices go to stderr
   console.error(`ddag MCP server ready — cwd: ${process.cwd()} — chain file: ${file}`)
+  ensureDashboard()
+}
+
+/**
+ * The dashboard is one long-lived local process shared by every session. When
+ * nothing is listening on its port, this server starts it detached beside its
+ * own bundle (dist/ddag-dashboard.mjs), so installing the tool is the whole
+ * setup; a running one is left alone. DDAG_NO_DASHBOARD=1 opts out.
+ */
+function ensureDashboard(): void {
+  if (process.env['DDAG_NO_DASHBOARD']) return
+  const port = Number(process.env['PORT'] ?? 5199)
+  const probe = createConnection({ host: '127.0.0.1', port })
+  probe.once('connect', () => probe.destroy())
+  probe.once('error', () => {
+    const bundle = join(dirname(fileURLToPath(import.meta.url)), 'ddag-dashboard.mjs')
+    if (!existsSync(bundle)) return
+    try {
+      const child = spawn(process.execPath, [bundle], { detached: true, stdio: 'ignore', env: { ...process.env, PORT: String(port) } })
+      child.unref()
+      console.error(`ddag: dashboard started — http://localhost:${port}/`)
+    } catch (e) {
+      console.error(`ddag: dashboard could not be started: ${String(e)}`)
+    }
+  })
 }

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "ddag": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@dreamc0der/ddag@latest"
+      ]
+    }
+  }
+}

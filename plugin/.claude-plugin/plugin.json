@@ -1,0 +1,10 @@
+{
+  "name": "ddag",
+  "description": "Decompose DAG: an epistemic scaffold for vibe coding. The agent decomposes the target into claims and verifies them bottom-up with evidence pinned to commits; findings, versions and audits are recorded on one replayable chain; a live dashboard shows it.",
+  "version": "0.3.0",
+  "author": { "name": "dream coder", "url": "https://github.com/DreamC0der-AI" },
+  "homepage": "https://github.com/DreamC0der-AI/ddag",
+  "repository": "https://github.com/DreamC0der-AI/ddag",
+  "license": "MIT",
+  "keywords": ["mcp", "verification", "audit", "epistemic", "decomposition", "vibe-coding"]
+}
