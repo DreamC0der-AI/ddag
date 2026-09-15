@@ -79,7 +79,10 @@ Open any project folder in Claude Code and ask it to build with DDAG:
 > record what you find.
 
 The first operation creates `<folder>/ddag.json` and registers the project in
-`~/.ddag/projects.json` (set `DDAG_HOME` to move the registry). From then on:
+`~/.ddag/projects.json` (set `DDAG_HOME` to move the registry). The agent
+starts with `graph_new`, which names the build target as the root claim; on a
+folder that already has a chain, `graph_new` replaces it, so a root that needs
+a better wording is restated with `mutate` instead. From then on:
 
 - The agent adds claims with a `verify:` criterion that names what evidence
   settles each one, and a `rationale` for every structural decision.
@@ -114,13 +117,16 @@ the protocol in the tool's instructions:
    settles it (a fuzz harness, an interleaving test, crash injection, a review
    of named functions).
 3. The pending leaves are the audit plan. A property that holds is verified
-   with what was run. One shown false is refuted and the finding is recorded as
-   an issue on that property.
+   with what was run. One shown false is judged invalid (`refute`, if it had
+   already been verified; `verify` = invalid otherwise) and the finding is
+   recorded as an issue on that property.
 4. A finding that fits no claim reveals a missing property: add it, then refute
    it. Growth is visible and bounded by the tree.
 5. The fixer never re-verifies its own fix. After the issue closes, an
-   independent re-examination re-judges the claim, and the server says so when
-   a session verifies a claim whose issue it closed.
+   independent re-examination re-judges the claim. The server says so when the
+   same server process that closed the issue verifies the claim; a reconnected
+   session does not carry that memory, so the evidence of a re-verification
+   names the re-examination that made it.
 6. The root is solid only when every property has been judged by its stated
    method. What remains unexamined is visible as absence, not as a surprise
    next round.
@@ -162,7 +168,9 @@ file; nothing needs a refresh. Its sections, from the first screenshot:
 - **Graph** (centre). Nodes are claims; arcs point from part to whole; the
   root has an inner ring. Green is valid, yellow pending, red invalid. A
   shadow marks the frontier. A `!` badge marks a judgment that is stale, with
-  the changed hunks and their function names in the tooltip. A count badge
+  the changed hunks in the tooltip and the function each falls in when git can
+  name one; a judgment pinned on a dirty tree shows its diff as approximate,
+  so commit before judging when the hunks matter. A count badge
   shows open issues on the claim in red, or all-closed in grey. The `i`
   button shows the legend.
 - **Detail panel** (bottom). The selected claim: its text, verdict and
@@ -205,8 +213,8 @@ source of trust.
 | `restructure` | A topic gets its properties: add the parts it stands for, all or nothing. |
 | `issue_open` / `issue_close` / `issue_list` | Record a finding with its full detail on the claim it concerns; close it with an outcome and what changed; the fixer's worklist. |
 | `version_mark` / `version_list` | Declare a working version after the commit that concluded it; every version with what the chain said of it then. |
-| `graph_state` / `graph_history` / `graph_audit` | The standing and frontier; the chain; which judgments rest on code that changed since, with the hunks. |
-| `graph_new` / `graph_open` | Start a chain in this folder; open one under it. |
+| `graph_state` / `graph_history` / `graph_audit` | The standing and frontier; the chain; which judgments rest on code that changed since, with the hunks (approximate for a judgment pinned on a dirty tree). |
+| `graph_new` / `graph_open` | Start a chain in this folder with the target as its root, replacing any chain already there; open one under it. |
 
 ## Storage
 

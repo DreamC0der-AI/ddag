@@ -27,7 +27,7 @@ describe('explainEvent', () => {
     const lines = lastExplained(c).join('\n')
     expect(lines).toContain('a added as a part of root')
     expect(lines).toContain('root unaffected')
-    expect(lines).toContain('[T1 vacuous]')
+    expect(lines).toContain('[nothing to reopen]')
     expect(lines).toContain('ready to verify now: a')
   })
 
@@ -39,7 +39,7 @@ describe('explainEvent', () => {
     mustDispatch(c, add('b', 'root'))
     const lines = lastExplained(c).join('\n')
     expect(lines).toContain('root needs a fresh judgment — its parts changed')
-    expect(lines).not.toContain('[T1 vacuous]')
+    expect(lines).not.toContain('[nothing to reopen]')
   })
 
   it('mutating a verified part names T3 on itself and T2 on the whole above it', () => {
@@ -111,7 +111,7 @@ describe('explainEvent', () => {
     mustDispatch(c, add('a', 'root'))
     mustDispatch(c, { type: 'mutate', id: 'a', content: 'v2' })
     const lines = lastExplained(c).join('\n')
-    expect(lines).toContain('[T3 vacuous]')
+    expect(lines).toContain('[nothing to reopen]')
     expect(lines).toContain('nothing to reopen')
   })
 })

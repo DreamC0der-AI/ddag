@@ -95,12 +95,12 @@ export function explainEvent(before: Snapshot, after: Snapshot, op: ChainOp): st
         lines.push(
           was === 'pending'
             ? `${op.id} restated back to its verified wording — verified again automatically [Restore]`
-            : `${op.id} restated to exactly its verified wording — reopened and verified again in the same step [T3, Restore]`,
+            : `${op.id} restated to exactly its verified wording — reopened and verified again in the same step [restated, Restore]`,
         )
       } else if (was === 'pending') {
-        lines.push(`${op.id} restated; it was not verified anyway, so nothing to reopen [T3 vacuous]`)
+        lines.push(`${op.id} restated; it was not verified anyway, so nothing to reopen [nothing to reopen]`)
       } else {
-        lines.push(`${op.id} restated — its ${was} verdict no longer applies, it needs a fresh judgment${healNote(op.id)} [T3]`)
+        lines.push(`${op.id} restated — its ${was} verdict no longer applies, it needs a fresh judgment${healNote(op.id)} [restated]`)
       }
       break
     }
@@ -124,7 +124,7 @@ export function explainEvent(before: Snapshot, after: Snapshot, op: ChainOp): st
     const was = verdictBefore.get(structuralTarget)
     if (was !== 'valid') {
       lines.push(
-        `${structuralTarget} unaffected — it was not verified (${was}), so there was nothing to reopen [T1 vacuous]`,
+        `${structuralTarget} unaffected — it was not verified (${was}), so there was nothing to reopen [nothing to reopen]`,
       )
     }
   }
@@ -140,7 +140,7 @@ export function explainEvent(before: Snapshot, after: Snapshot, op: ChainOp): st
       continue
     }
     if (v.id === structuralTarget) {
-      lines.push(`${v.id} needs a fresh judgment — its parts changed${healNote(v.id)} [T1]`)
+      lines.push(`${v.id} needs a fresh judgment — its parts changed${healNote(v.id)} [parts changed]`)
       continue
     }
     // T2: a part of v.id went solid→un-solid in this event
@@ -152,7 +152,7 @@ export function explainEvent(before: Snapshot, after: Snapshot, op: ChainOp): st
     lines.push(
       `${v.id} needs a fresh judgment — ${
         culprits.length > 0 ? `its part ${culprits.join(', ')} is no longer verified` : 'a part below it is no longer verified'
-      }${healNote(v.id)} [T2]`,
+      }${healNote(v.id)} [a part reopened]`,
     )
   }
 

@@ -225,7 +225,7 @@ export class McpStore {
     if (ranks.length === 0) {
       const bare = !g.solid(g.root) && g.predecessors(g.root).length === 0
       const note = this.recordNotes()
-      return `Root ${g.root}: ${rootState}.${note} Frontier: ${bare ? '(empty — decompose the root first; P1 keeps a bare-root verify off the table)' : '(empty)'}`
+      return `Root ${g.root}: ${rootState}.${note} Frontier: ${bare ? '(empty — decompose the root first; a root with no parts is never judged)' : '(empty)'}`
     }
     const issuesNote = this.recordNotes()
     const fmt = (r: FrontierRank): string => {

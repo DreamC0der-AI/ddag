@@ -181,7 +181,7 @@ function DetailPanel({ id, onSelect }: { id: string | null; onSelect: (id: strin
 function LegendTip() {
   const [open, setOpen] = useState(false)
   return (
-    <div className="legend-tip" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+    <div className="legend-tip">
       <button
         type="button"
         className="legend-btn"
@@ -360,7 +360,7 @@ function ActionLog() {
           <button
             type="button"
             className={verbose ? 'log-tab log-tab-on' : 'log-tab'}
-            title="every event with its decision, grounds, and consequences attributed to their causes (T1/T2/T3, Restore, drops, frontier)"
+            title="every event with its decision, grounds, and consequences attributed to their causes (reopenings, Restore, drops, frontier)"
             onClick={() => setVerbose(true)}
           >
             verbose
@@ -626,8 +626,21 @@ function SidebarResizer({ onResize }: { onResize: (w: number) => void }) {
   )
 }
 
+/** The tab title names what the tab shows, so several project tabs can be told apart. */
+export function titleFor(loc: { pathname: string; search: string }): string {
+  const route = routeOf(loc)
+  if (route === 'home') return 'DDAG — Projects'
+  if (route === 'sandbox') return 'DDAG — Sandbox'
+  const m = /^\/p\/([^/]+)\/?$/.exec(loc.pathname)
+  const name = m ? decodeURIComponent(m[1]!) : (new URLSearchParams(loc.search).get('chain') ?? 'chain')
+  return `DDAG — ${name}`
+}
+
 export default function App() {
   const route = routeOf(window.location)
+  useEffect(() => {
+    document.title = titleFor(window.location)
+  }, [route])
   if (route === 'home') return <Home />
   return <Workbench />
 }
