@@ -104,6 +104,32 @@ describe('audit — what changed under a judgment, and what a judgment rests on'
     expect(outside.warnings.join(' ')).toContain('paths are relative to it')
   })
 
+  it('a folder pin leaves out the chain file: not stale on the event that records it, and code under the folder is still watched (WT-1)', () => {
+    const dir = scratch()
+    writeFileSync(join(dir, 'greet.sh'), 'echo hello\n')
+    const chainFile = join(dir, 'ddag.json')
+    writeFileSync(chainFile, '{"events":[]}')
+    const chain = EventChain.create('target', 'the target')
+    chain.dispatch({ type: 'add', id: 'n1', content: 'greet works', successor: 'target' })
+    const { provenance: pin, warnings } = collectProvenance(`ran ./greet.sh in ${dir}`, [], dir, chainFile)
+    expect(pin.artifacts.map((a) => a.path)).toEqual(['.', 'greet.sh']) // the folder, and the file the prose names
+    expect(warnings.join(' ')).not.toContain('chain itself')
+    chain.dispatch({ type: 'verify', id: 'n1', result: 'valid' }, undefined, 'ran the folder', pin)
+    // the recording event rewrites the chain file — the folder pin must not see it
+    writeFileSync(chainFile, '{"events":[{"seq":1}]}')
+    expect(auditChain(chain, dir, { chainFile }).nodes['n1']).toMatchObject({ status: 'intact' })
+    // a second ddag.json that is not the chain is still part of the folder
+    writeFileSync(join(dir, 'other-ddag.json'), '{}')
+    expect(auditChain(chain, dir, { chainFile }).nodes['n1']).toMatchObject({ status: 'stale', changed: ['.'] })
+    const pin2 = collectProvenance('ran the folder again', ['.'], dir, chainFile).provenance
+    chain.dispatch({ type: 'doubt', id: 'n1' })
+    chain.dispatch({ type: 'verify', id: 'n1', result: 'valid' }, undefined, 'ran the folder again', pin2)
+    expect(auditChain(chain, dir, { chainFile }).nodes['n1']).toMatchObject({ status: 'intact' })
+    // code under the folder moves: still watched
+    writeFileSync(join(dir, 'greet.sh'), 'echo goodbye\n')
+    expect(auditChain(chain, dir, { chainFile }).nodes['n1']).toMatchObject({ status: 'stale', changed: ['.'] })
+  })
+
   it('a node with parts and no cited files rests on its parts; a leaf with none is unwatched', () => {
     const dir = scratch()
     const chain = EventChain.create('target', 'the target')

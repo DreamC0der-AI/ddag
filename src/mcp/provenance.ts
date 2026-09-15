@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, lstatSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import type { EventChain, Provenance } from '../chain/chain'
 import type { NodeId } from '../kernel/types'
 
@@ -20,9 +20,26 @@ function hashFile(abs: string): string {
   return createHash('sha256').update(readFileSync(abs)).digest('hex')
 }
 
-/** A directory hashes as the sorted list of (relative path, file hash) beneath it. */
-export function hashPath(abs: string): string {
+const realOrSelf = (p: string): string => {
+  try {
+    return realpathSync(p)
+  } catch {
+    return p
+  }
+}
+
+/**
+ * A directory hashes as the sorted list of (relative path, file hash)
+ * beneath it — minus `exclude`, the chain the judgment is recorded in: it
+ * changes with every event, so a folder pin that covered it would be stale
+ * on the event that records it (WT-1). Matched by path, exactly, not by
+ * name, so another ddag.json under the folder is still watched.
+ */
+export function hashPath(abs: string, exclude?: string): string {
   if (statSync(abs).isFile()) return hashFile(abs)
+  const skip = exclude === undefined ? null : { plain: resolve(exclude), real: realOrSelf(exclude) }
+  const excluded = (p: string): boolean =>
+    skip !== null && (p === skip.plain || (basename(p) === basename(skip.real) && realOrSelf(p) === skip.real))
   const h = createHash('sha256')
   const files: string[] = []
   const walk = (dir: string) => {
@@ -33,7 +50,7 @@ export function hashPath(abs: string): string {
       const st = lstatSync(p)
       if (st.isSymbolicLink()) continue // a link may leave the root; a directory hash covers what is here
       if (st.isDirectory()) walk(p)
-      else files.push(p)
+      else if (!excluded(p)) files.push(p)
       if (files.length >= MAX_DIR_FILES) return
     }
   }
@@ -163,9 +180,10 @@ export interface Collected {
 
 /**
  * Pin the evidence's artifacts. `chainFile` is the chain this judgment is
- * being recorded in: it is never pinned, because it changes with every
- * later operation — a judgment that cited it would go stale on the next
- * event, and the chain cannot be evidence for a judgment inside it.
+ * being recorded in: it is never pinned, neither by name nor inside a
+ * pinned directory, because it changes with every later operation — a
+ * judgment that covered it would go stale on the next event, and the chain
+ * cannot be evidence for a judgment inside it.
  */
 export function collectProvenance(
   evidence: string,
@@ -195,7 +213,8 @@ export function collectProvenance(
       warnings.push(`'${p}' is the chain itself — not pinned (it changes with every operation, so citing it would mark this judgment stale at once)`)
     }
   }
-  const artifacts = [...paths].sort().map((path) => ({ path, hash: hashPath(resolve(root, path)) }))
+  const exclude = chainFile === undefined ? undefined : resolve(chainFile)
+  const artifacts = [...paths].sort().map((path) => ({ path, hash: hashPath(resolve(root, path), exclude) }))
   if (artifacts.length === 0)
     warnings.push(
       '0 artifacts pinned — cite file paths in the evidence (or pass `artifacts`) so graph_audit can watch this judgment; as recorded it is unwatched',
@@ -374,7 +393,7 @@ export function diffSincePin(root: string, commit: string, path: string): { adde
  * The audit of every valid node's last valid judgment — one function behind
  * the MCP graph_audit text and the dashboard's /api/audit.
  */
-export function auditChain(chain: EventChain, defaultRoot: string, opts: { diffs?: boolean } = {}): ChainAudit {
+export function auditChain(chain: EventChain, defaultRoot: string, opts: { diffs?: boolean; chainFile?: string } = {}): ChainAudit {
   const g = chain.graph
   const events = chain.chain()
   const nodes: Record<NodeId, NodeAudit> = {}
@@ -409,7 +428,7 @@ export function auditChain(chain: EventChain, defaultRoot: string, opts: { diffs
       continue
     }
     const root = resolveRoot(p, defaultRoot)
-    const audit = auditProvenance(p, root)
+    const audit = auditProvenance(p, root, opts.chainFile)
     const changed = audit.filter((a) => a.status === 'changed').map((a) => a.path)
     const missing = audit.filter((a) => a.status === 'missing').map((a) => a.path)
     const stale = changed.length + missing.length > 0
@@ -433,11 +452,12 @@ export interface ArtifactAudit {
   status: 'unchanged' | 'changed' | 'missing'
 }
 
-/** Re-hash the recorded artifacts against the working tree. */
-export function auditProvenance(p: Provenance, root: string): ArtifactAudit[] {
+/** Re-hash the recorded artifacts against the working tree; `chainFile` is left out of directory hashes as at pin time. */
+export function auditProvenance(p: Provenance, root: string, chainFile?: string): ArtifactAudit[] {
+  const exclude = chainFile === undefined ? undefined : resolve(chainFile)
   return p.artifacts.map(({ path, hash }) => {
     const abs = resolve(root, path)
     if (!existsSync(abs) || containedReal(root, abs) === null) return { path, status: 'missing' }
-    return { path, status: hashPath(abs) === hash ? 'unchanged' : 'changed' }
+    return { path, status: hashPath(abs, exclude) === hash ? 'unchanged' : 'changed' }
   })
 }

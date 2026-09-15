@@ -47,7 +47,7 @@ const auditCache = new Map<string, { at: number; audit: ChainAudit }>()
 export function auditFor(entry: ProjectEntry, chain: EventChain): ChainAudit {
   const hit = auditCache.get(entry.chain)
   if (hit && Date.now() - hit.at < AUDIT_TTL_MS) return hit.audit
-  const audit = auditChain(chain, entry.dir, { diffs: true })
+  const audit = auditChain(chain, entry.dir, { diffs: true, chainFile: entry.chain })
   auditCache.set(entry.chain, { at: Date.now(), audit })
   return audit
 }

@@ -291,7 +291,7 @@ export class McpStore {
 
   /** Valid judgments whose pinned artifacts changed or vanished since. */
   staleCount(): number {
-    return auditChain(this.chain, this.root).summary.stale
+    return auditChain(this.chain, this.root, { chainFile: this._file }).summary.stale
   }
 
   /** Invalid claims on the frontier whose recorded issues are all closed — the fix is in, the judgment is not. */
@@ -385,7 +385,7 @@ export class McpStore {
     this.refresh()
     const refused = this.refuseIfBroken()
     if (refused !== null) return refused
-    const { nodes, summary } = auditChain(this.chain, this.root, { diffs: true })
+    const { nodes, summary } = auditChain(this.chain, this.root, { diffs: true, chainFile: this._file })
     const lines: string[] = []
     for (const [id, a] of Object.entries(nodes)) {
       switch (a.status) {

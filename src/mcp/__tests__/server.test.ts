@@ -187,6 +187,22 @@ describe('ddag MCP server', () => {
     expect(state.text).toContain('- authz [pending')
   })
 
+  it('a verify whose evidence names the project folder is not stale on its own reply nor on the next audit (WT-1)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ddag-'))
+    const { writeFileSync } = await import('node:fs')
+    writeFileSync(join(dir, 'greet.sh'), 'echo hello\n')
+    const client = await connect(new McpStore(join(dir, 'ddag.json'), dir), dir)
+    await call(client, 'add', { id: 'n1', content: 'greet works', successor: 'target' })
+    const judged = await call(client, 'verify', { id: 'n1', result: 'valid', evidence: `Ran ./greet.sh with no argument in ${dir}; it printed hello` })
+    expect(judged.text).toContain('2 artifacts]') // the folder and greet.sh, as the tester saw
+    expect(judged.text).not.toContain('Stale:')
+    const next = await call(client, 'add', { id: 'n2', content: 'docs ok', successor: 'target' })
+    expect(next.text).not.toContain('Stale:')
+    expect((await call(client, 'graph_audit')).text).toContain('- n1: intact')
+    writeFileSync(join(dir, 'greet.sh'), 'echo goodbye\n')
+    expect((await call(client, 'graph_audit')).text).toContain('- n1: STALE?')
+  })
+
   it('reverify re-judges in one call; the standing line counts stale judgments and names claims ready to re-verify; a root verify over stale parts is warned', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'ddag-'))
     const { writeFileSync } = await import('node:fs')
