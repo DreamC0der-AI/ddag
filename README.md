@@ -29,6 +29,40 @@ concluded it. The root is solid only when every claim under it has been
 verified. The whole history is an append-only chain of events, replayed
 deterministically, so the process itself can be read back.
 
+## What's new in 0.4
+
+- **Targets.** One chain carries a main target, the build, and sub-targets for
+  pipelines that consume it, such as publishing. A sub-target's wait never
+  reads as the build being broken. `target_new`, `target_switch`, `target_list`.
+- **Each claim has its own history.** `graph_history` reads one claim's chain,
+  one target's, or what happened since a position, with the cause of every
+  reopening named. `why` says in a few lines what put a claim in its state.
+- **Rounds and pins.** A change is described once (`round_record`) and cited by
+  the judgments re-anchored after it, which then say one sentence about their
+  own claim. A judgment pins the files it was given, and a claim with parts
+  pins none, so an edit stales only the claims that rest on the edited file.
+- **Cheaper to talk to.** `graph_state` is one line per claim with the frontier
+  in full, and judgment replies no longer quote the evidence back.
+- **Dashboard.** A target switcher, a one-sentence judgment with a per-claim
+  timeline, and a graph laid out on depth rings where no arc crosses a claim.
+- **Releases come from CI.** A tag runs the tests and publishes through npm
+  trusted publishing, so every version carries a provenance attestation.
+
+Measured by the harness in [`bench/`](bench/README.md), which drives each
+published version through its public interface only, same cases for all:
+
+| One scripted working session | 0.3.2 | 0.4.1 |
+|---|---|---|
+| Context an agent pays for the session | 40.3 KB | 12.3 KB |
+| `graph_state` at 200 claims | 72.4 KB | 9.1 KB |
+| Files pinned per judgment | 4 | 1.1 |
+| Judgments staled by editing one file (right answer: 1) | 9 | 1 |
+| Latency of a judgment | 21.6 ms | 18.3 ms |
+
+These numbers show mechanisms working and guard against regressions. Whether
+agents build better software with DDAG is a separate, outcome benchmark that is
+planned in the same folder and not yet run.
+
 ## Install
 
 Requires Node.js 22 or later and git. With [Claude Code](https://claude.com/claude-code):
@@ -263,6 +297,8 @@ npm run dev               # the web app with HMR on :5299 (/api proxied to :5199
 - **DOCTRINE.md** is how to play it well: when to open a graph, when to
   decompose, how to judge, how to repair, how to audit.
 - **ALGORITHMS.md** names the kernel's algorithms against the design.
+- **bench/** measures versions side by side; **RELEASING.md** says how a
+  release goes out.
 - DDAG is built through DDAG: the repository's own chain and the projects
   used to exercise it are the author's working record and are not published.
   `ddag.json`, `testcases/` and `testbed/` are ignored, so a chain you start

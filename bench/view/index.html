@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DDAG benchmarks</title>
+    <link rel="stylesheet" href="/view/styles.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div>
+        <h1>DDAG benchmarks</h1>
+        <p class="sub" id="sub">Each version is driven through its public interface only, by the same harness and the same cases.</p>
+      </div>
+      <form class="filters" id="filters" aria-label="Versions to compare">
+        <label>Show <select id="sel-current"></select></label>
+        <label>against <select id="sel-base"></select></label>
+      </form>
+    </header>
+    <main>
+      <section class="tiles" id="tiles" aria-label="Headline numbers"></section>
+      <section id="tables"></section>
+      <section class="detail" id="detail" hidden aria-live="polite"></section>
+      <p class="foot" id="foot"></p>
+    </main>
+    <div class="tip" id="tip" role="status" hidden></div>
+    <script type="module" src="/view/view.js"></script>
+  </body>
+</html>

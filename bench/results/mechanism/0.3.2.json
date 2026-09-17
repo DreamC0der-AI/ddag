@@ -1,0 +1,3825 @@
+{
+ "suite": "mechanism",
+ "version": "0.3.2",
+ "source": "npm",
+ "harness": "1",
+ "date": "2026-09-17T08:49:25.727Z",
+ "env": {
+  "node": "v25.9.0",
+  "platform": "darwin 25.6.0",
+  "cpu": "Apple M5"
+ },
+ "cases": {
+  "scale": {
+   "title": "Growth: reading and writing a graph of 60 and 200 claims",
+   "hash": "3a5da36d7a0e",
+   "metrics": {
+    "state_bytes_at_60": {
+     "value": 22315,
+     "unit": "bytes",
+     "better": "lower",
+     "label": "graph_state at 60 claims"
+    },
+    "state_bytes_at_200": {
+     "value": 74088,
+     "unit": "bytes",
+     "better": "lower",
+     "label": "graph_state at 200 claims"
+    },
+    "op_latency_ms_at_60": {
+     "value": 22.7,
+     "unit": "ms",
+     "better": "lower",
+     "label": "Judgment latency at 60 claims"
+    },
+    "op_latency_ms_at_200": {
+     "value": 31.1,
+     "unit": "ms",
+     "better": "lower",
+     "label": "Judgment latency at 200 claims"
+    },
+    "chain_file_bytes_at_200": {
+     "value": 140432,
+     "unit": "bytes",
+     "better": "lower",
+     "label": "Chain file at 200 claims"
+    }
+   },
+   "steps": [
+    {
+     "name": "new",
+     "tool": "graph_new",
+     "bytes": 121,
+     "ms": 4.2,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 120,
+     "ms": 1.3,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 0.8,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 23.7,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 1,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 21.1,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 0.9,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 20.6,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 0.9,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 20.7,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 1.1,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 22.1,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 221,
+     "ms": 20,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 120,
+     "ms": 0.9,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 0.8,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 20.9,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 1,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 20.4,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 1,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 19.9,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 1,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 20,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 1.2,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 21.4,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 221,
+     "ms": 20.2,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 120,
+     "ms": 1.1,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 1,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 20.7,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 1.2,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 20.5,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 1.2,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 21.6,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 1.3,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 20.5,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 1.5,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 20.5,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 221,
+     "ms": 20.6,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 120,
+     "ms": 1.3,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 1.3,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 20.8,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 1.5,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 21.6,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 1.4,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 20.9,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 1.6,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 20.6,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 1.5,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 21,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 221,
+     "ms": 20.3,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 120,
+     "ms": 1.6,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 1.6,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 21.3,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 1.6,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 21.4,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 1.6,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 21,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 1.6,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 21,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 1.7,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 21,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 221,
+     "ms": 21.1,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 120,
+     "ms": 1.7,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 1.7,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 21.3,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 1.7,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 20.9,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 1.8,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 20.7,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 1.8,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 21.9,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 2.8,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 22.1,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 221,
+     "ms": 21.1,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 120,
+     "ms": 2,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 1.9,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 21,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 2,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 21.6,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 2,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 20.8,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 2,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 21.2,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 2,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 20.4,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 221,
+     "ms": 20.1,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 120,
+     "ms": 2.1,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 2.1,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 22.7,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 2.1,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 22.5,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 2.3,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 21.6,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 2.2,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 21.5,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 2.5,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 22.1,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 221,
+     "ms": 21.5,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 120,
+     "ms": 2.4,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 2.3,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 23.5,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 2.5,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 21.9,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 2.4,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 22.3,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 2.6,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 22.8,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 127,
+     "ms": 3.3,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 265,
+     "ms": 22.9,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 221,
+     "ms": 21.8,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 2.6,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 2.5,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 21.8,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 2.7,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 21.7,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 2.7,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 21.8,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 2.6,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 23.3,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 2.8,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 21.9,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 21.8,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 2.7,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 3,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 21.7,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 2.9,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 23.3,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 2.9,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 22.5,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 2.9,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 22.6,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 4.1,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 22.6,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 23.4,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 3,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 3.1,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 22.7,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 3.1,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 23,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 3.3,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 22.5,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 3.1,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 24.5,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 3.3,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 22.6,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 22.7,
+     "ok": true
+    },
+    {
+     "name": "read state at 60",
+     "tool": "graph_state",
+     "bytes": 22315,
+     "ms": 3.7,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 3.2,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 3.2,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 23.4,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 3.3,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 23,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 3.3,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 23.9,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 3.3,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 22.9,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 3.4,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 23.1,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 22.6,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 3.4,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 3.4,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 22.8,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 3.5,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 22.6,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 3.4,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 22.6,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 3.6,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 23.5,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 3.7,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 25.1,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 23.8,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 3.6,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 3.6,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 23.8,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 3.6,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 24,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 3.9,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 26.8,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 3.9,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 24.2,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 3.9,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 23.6,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 23.7,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 4,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 4,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 23.5,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 3.9,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 24.7,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 3.9,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 23,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 4,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 24.1,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 4.1,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 24.8,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 23.4,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 4.1,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 4,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 23.7,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 4,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 23.6,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 4.3,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 24.1,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 4.2,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 24.7,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 4.4,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 24.5,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 23.8,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 4.3,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 4.4,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 24.6,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 4.4,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 25.1,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 4.3,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 26,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 4.5,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 25.6,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 4.6,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 25.3,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 24.1,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 4.4,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 4.4,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 24.2,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 4.8,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 24.5,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 4.7,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 24.8,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 5.1,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 25.1,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 4.8,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 24.7,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 24.4,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 4.9,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 4.7,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 25.8,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 5.4,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 25.9,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 4.8,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 24.9,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 5.1,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 25.3,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 4.8,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 24.8,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 25.3,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 5.3,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 5.3,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 26.3,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 5,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 25.4,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 7.5,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 25.5,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 5,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 25.1,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 5.2,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 25.1,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 26.2,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 5.4,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 5.3,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 25.5,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 5.1,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 25,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 5.3,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 24.9,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 5.3,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 26.4,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 5.4,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 25.4,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 25.4,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 5.4,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 5.4,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 26,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 5.4,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 26.4,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 5.5,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 25.3,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 5.5,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 25.1,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 5.7,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 26.4,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 24.9,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 5.6,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 5.7,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 26.2,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 5.7,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 29.4,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 5.8,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 26.2,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 5.7,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 25.7,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 5.7,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 26.9,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 25.2,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 5.7,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 5.8,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 25.9,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 5.7,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 25.3,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 5.8,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 26.9,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 5.9,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 25.5,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 5.8,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 25.7,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 25.6,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 5.9,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 5.9,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 26.1,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 6.2,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 26.8,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 6.4,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 27.1,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 6,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 26.7,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 6.5,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 26.8,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 26,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 6.2,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 6.2,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 26.3,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 8.7,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 27.8,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 6.3,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 26,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 6.3,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 27.6,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 6.4,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 26.2,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 25.8,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 6.3,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 6.4,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 26.8,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 6.4,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 27.5,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 6.5,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 27.1,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 6.5,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 26.7,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 6.5,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 26.4,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 27.3,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 6.7,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 6.5,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 26.7,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 6.9,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 26.8,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 6.6,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 26.8,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 6.9,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 27.9,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 6.7,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 27,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 26.6,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 7,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 6.9,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 30.2,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 7,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 26.8,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 6.8,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 26.9,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 7,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 27.2,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 7.1,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 27.2,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 26.9,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 7,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 7.2,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 28.8,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 7.1,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 28.6,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 7.2,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 28.7,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 7.3,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 28.2,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 7.3,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 27.3,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 26.8,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 7.2,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 7.4,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 27.7,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 7.3,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 27.8,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 7.3,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 27.7,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 7.6,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 28.6,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 7.3,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 28,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 27.5,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 7.4,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 7.5,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 29.2,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 7.5,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 28,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 7.6,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 27.3,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 7.6,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 27.3,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 7.6,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 29.1,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 27.6,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 7.6,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 7.7,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 28.1,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 7.8,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 29.3,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 7.8,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 27.9,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 8,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 28.2,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 7.9,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 28.8,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 28.1,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 8.1,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 7.9,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 28.3,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 8,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 29.3,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 8,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 28.5,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 8.3,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 28.1,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 8,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 30.5,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 29.2,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 10.9,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 8.3,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 29.4,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 8.3,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 30.2,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 11.5,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 29.4,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 8.5,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 29.3,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 9.3,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 30.2,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 28.4,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 8.5,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 8.9,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 29.7,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 8.9,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 30.2,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 8.5,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 29.2,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 8.5,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 29.3,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 8.5,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 30.1,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 28.4,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 8.8,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 8.7,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 29.3,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 8.6,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 29.2,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 8.7,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 28.9,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 8.8,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 29.3,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 8.8,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 30.1,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 31.2,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 8.9,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 8.7,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 30.5,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 9,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 30,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 8.9,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 29.5,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 9.1,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 30.5,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 9.1,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 29.9,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 29.6,
+     "ok": true
+    },
+    {
+     "name": "add group",
+     "tool": "add",
+     "bytes": 124,
+     "ms": 9.1,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 9,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 33.8,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 10.2,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 32.2,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 10.2,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 31.8,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 9.6,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 30.3,
+     "ok": true
+    },
+    {
+     "name": "add claim",
+     "tool": "add",
+     "bytes": 132,
+     "ms": 9.1,
+     "ok": true
+    },
+    {
+     "name": "judge claim",
+     "tool": "verify",
+     "bytes": 269,
+     "ms": 29.3,
+     "ok": true
+    },
+    {
+     "name": "judge group",
+     "tool": "verify",
+     "bytes": 223,
+     "ms": 29.4,
+     "ok": true
+    },
+    {
+     "name": "read state at 200",
+     "tool": "graph_state",
+     "bytes": 74088,
+     "ms": 10.8,
+     "ok": true
+    }
+   ]
+  },
+  "standard-session": {
+   "title": "One working session: decompose, judge, read back, a file changes, re-anchor",
+   "hash": "a5c1929e7b1c",
+   "metrics": {
+    "session_reply_bytes": {
+     "value": 41237,
+     "unit": "bytes",
+     "better": "lower",
+     "label": "Context cost of the whole session",
+     "note": "sum of every reply the server sent during the session"
+    },
+    "state_bytes": {
+     "value": 8242,
+     "unit": "bytes",
+     "better": "lower",
+     "label": "graph_state, 13 claims judged"
+    },
+    "history_bytes": {
+     "value": 5865,
+     "unit": "bytes",
+     "better": "lower",
+     "label": "graph_history, default call"
+    },
+    "claim_history_bytes": {
+     "value": null,
+     "unit": "bytes",
+     "better": "lower",
+     "label": "One claim's own history",
+     "note": "not available before graph_history took a node"
+    },
+    "judgment_reply_bytes": {
+     "value": 620,
+     "unit": "bytes",
+     "better": "lower",
+     "label": "Reply to one judgment",
+     "note": "evidence text is 483 bytes; a reply that quotes it back costs more"
+    },
+    "reanchor_reply_bytes": {
+     "value": 454,
+     "unit": "bytes",
+     "better": "lower",
+     "label": "Reply to one re-anchoring"
+    },
+    "pins_per_judgment": {
+     "value": 4,
+     "unit": "files",
+     "better": "lower",
+     "label": "Files pinned per leaf judgment",
+     "note": "one artifact passed explicitly (two for m1); the evidence text names three more files"
+    },
+    "pins_on_a_group": {
+     "value": 1,
+     "unit": "files",
+     "better": "lower",
+     "label": "Files pinned on a group judgment",
+     "note": "a claim with parts should rest on its parts"
+    },
+    "stale_after_one_file_edit": {
+     "value": 9,
+     "unit": "judgments",
+     "better": "lower",
+     "label": "Judgments staled by editing one file",
+     "note": "of 13; exactly one claim, m1, rests on the edited file \u2014 the right answer is 1"
+    },
+    "op_latency_ms": {
+     "value": 21.6,
+     "unit": "ms",
+     "better": "lower",
+     "label": "Median latency of a judgment"
+    },
+    "chain_bytes_per_event": {
+     "value": 495,
+     "unit": "bytes",
+     "better": "lower",
+     "label": "Chain file size per event"
+    },
+    "tools": {
+     "value": 23,
+     "unit": "tools",
+     "better": "neutral",
+     "label": "Tools the server offers"
+    },
+    "start_ms": {
+     "value": 314,
+     "unit": "ms",
+     "better": "lower",
+     "label": "Server start to first tool list",
+     "note": "through npx, cache warm",
+     "compare": "same-source"
+    },
+    "package_bytes": {
+     "value": 1441541,
+     "unit": "bytes",
+     "better": "lower",
+     "label": "npm package, unpacked"
+    }
+   },
+   "steps": [
+    {
+     "name": "new",
+     "tool": "graph_new",
+     "bytes": 121,
+     "ms": 2.8,
+     "ok": true
+    },
+    {
+     "name": "add group 1",
+     "tool": "add",
+     "bytes": 185,
+     "ms": 1.8,
+     "ok": true
+    },
+    {
+     "name": "add group 2",
+     "tool": "add",
+     "bytes": 177,
+     "ms": 5.6,
+     "ok": true
+    },
+    {
+     "name": "add group 3",
+     "tool": "add",
+     "bytes": 181,
+     "ms": 0.7,
+     "ok": true
+    },
+    {
+     "name": "add claim 1",
+     "tool": "add",
+     "bytes": 169,
+     "ms": 0.9,
+     "ok": true
+    },
+    {
+     "name": "add claim 2",
+     "tool": "add",
+     "bytes": 161,
+     "ms": 0.8,
+     "ok": true
+    },
+    {
+     "name": "add claim 3",
+     "tool": "add",
+     "bytes": 165,
+     "ms": 0.7,
+     "ok": true
+    },
+    {
+     "name": "add claim 4",
+     "tool": "add",
+     "bytes": 177,
+     "ms": 0.8,
+     "ok": true
+    },
+    {
+     "name": "add claim 5",
+     "tool": "add",
+     "bytes": 169,
+     "ms": 0.8,
+     "ok": true
+    },
+    {
+     "name": "add claim 6",
+     "tool": "add",
+     "bytes": 173,
+     "ms": 1,
+     "ok": true
+    },
+    {
+     "name": "add claim 7",
+     "tool": "add",
+     "bytes": 185,
+     "ms": 0.9,
+     "ok": true
+    },
+    {
+     "name": "add claim 8",
+     "tool": "add",
+     "bytes": 177,
+     "ms": 1.1,
+     "ok": true
+    },
+    {
+     "name": "add claim 9",
+     "tool": "add",
+     "bytes": 181,
+     "ms": 1.1,
+     "ok": true
+    },
+    {
+     "name": "judge claim 1",
+     "tool": "verify",
+     "bytes": 627,
+     "ms": 24.2,
+     "ok": true
+    },
+    {
+     "name": "judge claim 2",
+     "tool": "verify",
+     "bytes": 635,
+     "ms": 21.6,
+     "ok": true
+    },
+    {
+     "name": "judge claim 3",
+     "tool": "verify",
+     "bytes": 623,
+     "ms": 21.7,
+     "ok": true
+    },
+    {
+     "name": "judge claim 4",
+     "tool": "verify",
+     "bytes": 619,
+     "ms": 21.7,
+     "ok": true
+    },
+    {
+     "name": "judge claim 5",
+     "tool": "verify",
+     "bytes": 627,
+     "ms": 20.8,
+     "ok": true
+    },
+    {
+     "name": "judge claim 6",
+     "tool": "verify",
+     "bytes": 615,
+     "ms": 20.5,
+     "ok": true
+    },
+    {
+     "name": "judge claim 7",
+     "tool": "verify",
+     "bytes": 611,
+     "ms": 21.4,
+     "ok": true
+    },
+    {
+     "name": "judge claim 8",
+     "tool": "verify",
+     "bytes": 619,
+     "ms": 21.1,
+     "ok": true
+    },
+    {
+     "name": "judge claim 9",
+     "tool": "verify",
+     "bytes": 607,
+     "ms": 21.6,
+     "ok": true
+    },
+    {
+     "name": "judge group 1",
+     "tool": "verify",
+     "bytes": 239,
+     "ms": 22.5,
+     "ok": true
+    },
+    {
+     "name": "judge group 2",
+     "tool": "verify",
+     "bytes": 247,
+     "ms": 21.8,
+     "ok": true
+    },
+    {
+     "name": "judge group 3",
+     "tool": "verify",
+     "bytes": 264,
+     "ms": 21.4,
+     "ok": true
+    },
+    {
+     "name": "judge target",
+     "tool": "verify",
+     "bytes": 205,
+     "ms": 23.5,
+     "ok": true
+    },
+    {
+     "name": "read state",
+     "tool": "graph_state",
+     "bytes": 8242,
+     "ms": 2.6,
+     "ok": true
+    },
+    {
+     "name": "read history",
+     "tool": "graph_history",
+     "bytes": 5865,
+     "ms": 0.3,
+     "ok": true
+    },
+    {
+     "name": "read one claim history",
+     "tool": "graph_history",
+     "bytes": 5865,
+     "ms": 0.2,
+     "ok": true
+    },
+    {
+     "name": "why",
+     "tool": "why",
+     "na": true
+    },
+    {
+     "name": "audit (clean)",
+     "tool": "graph_audit",
+     "bytes": 1159,
+     "ms": 1.9,
+     "ok": true
+    },
+    {
+     "name": "audit (after one file changed)",
+     "tool": "graph_audit",
+     "bytes": 2068,
+     "ms": 94.1,
+     "ok": true
+    },
+    {
+     "name": "re-anchor m1",
+     "tool": "reverify",
+     "bytes": 462,
+     "ms": 22.4,
+     "ok": true
+    },
+    {
+     "name": "re-anchor m2",
+     "tool": "reverify",
+     "bytes": 462,
+     "ms": 22,
+     "ok": true
+    },
+    {
+     "name": "re-anchor m3",
+     "tool": "reverify",
+     "bytes": 462,
+     "ms": 21.8,
+     "ok": true
+    },
+    {
+     "name": "re-anchor m4",
+     "tool": "reverify",
+     "bytes": 462,
+     "ms": 21.2,
+     "ok": true
+    },
+    {
+     "name": "re-anchor m5",
+     "tool": "reverify",
+     "bytes": 462,
+     "ms": 21,
+     "ok": true
+    },
+    {
+     "name": "re-anchor m6",
+     "tool": "reverify",
+     "bytes": 462,
+     "ms": 22,
+     "ok": true
+    },
+    {
+     "name": "re-anchor m7",
+     "tool": "reverify",
+     "bytes": 462,
+     "ms": 21.4,
+     "ok": true
+    },
+    {
+     "name": "re-anchor m8",
+     "tool": "reverify",
+     "bytes": 462,
+     "ms": 20.7,
+     "ok": true
+    },
+    {
+     "name": "re-anchor m9",
+     "tool": "reverify",
+     "bytes": 392,
+     "ms": 20.8,
+     "ok": true
+    },
+    {
+     "name": "read state again",
+     "tool": "graph_state",
+     "bytes": 5191,
+     "ms": 1.1,
+     "ok": true
+    }
+   ]
+  }
+ }
+}

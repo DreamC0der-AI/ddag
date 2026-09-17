@@ -1,0 +1,3 @@
+# raw per-run material (transcripts, scratch projects); the summaries in results/ are committed
+results/runs/
+.tmp/

@@ -1,0 +1,10 @@
+{
+  "name": "ddag-bench",
+  "private": true,
+  "type": "module",
+  "description": "Benchmarks for DDAG: drives any published version through its public interface only, records metrics per version, and shows them side by side. Not part of the DDAG app or its npm package.",
+  "scripts": {
+    "bench": "node harness/run.mjs",
+    "view": "node view/serve.mjs"
+  }
+}
