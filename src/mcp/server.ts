@@ -200,7 +200,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
       title: 'Verify — submit a judgment',
       description:
-        'Record the outcome of actually examining a claim against evidence (tests, code, argument) — never bookkeeping. The evidence citation is REQUIRED (doctrine hook P2) and is recorded on the chain event as the judgment\'s grounds — cite what was actually examined ("vitest run testbed: 16 passed", "reviewed against CommonMark §4.1"). Only frontier nodes (all parts solid, verdict pending/invalid) are verifiable. Before submitting, audit the parts: real, load-bearing, complete. Record invalid honestly — red is information. A valid result may Restore a chain of ancestors for free. WRITE THE EVIDENCE FOR A READER WHO WAS NOT THERE: first sentence = what was examined and what it showed, in plain words; then the numbers; cite file paths (they pin the judgment). No private shorthand, version tags, or doctrine labels.',
+        'Record the outcome of actually examining a claim against evidence (tests, code, argument) — never bookkeeping. The evidence citation is REQUIRED (doctrine hook P2) and is recorded on the chain event as the judgment\'s grounds — cite what was actually examined ("vitest run testbed: 16 passed", "reviewed against CommonMark §4.1"). Only frontier nodes (all parts solid, verdict pending/invalid) are verifiable. Before submitting, audit the parts: real, load-bearing, complete. Record invalid honestly — red is information. A valid result may Restore a chain of ancestors for free. WRITE THE EVIDENCE FOR A READER WHO WAS NOT THERE: first sentence = what was examined and what it showed, in plain words; then the numbers; pass the files the claim rests on as artifacts (they pin the judgment). No private shorthand, version tags, or doctrine labels.',
       inputSchema: {
         id: z.string(),
         result: z.enum(['valid', 'invalid']).describe('what the examination found'),
@@ -212,7 +212,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
           .array(z.string())
           .optional()
           .describe(
-            'files or directories this evidence rests on (paths under the project root); pinned by content hash so graph_audit can tell when they change. Paths mentioned in the evidence text are pinned automatically',
+            'the files or directories THIS claim rests on (paths under the project root), pinned by content hash so graph_audit can tell when they change. When given, they are the whole pin set. Without them, a leaf falls back to the paths its evidence names; a claim with parts pins nothing and rests on its parts',
           ),
         round: z.string().optional().describe('the key of the round_record this judgment cites — the change is described there once; the evidence here is one sentence about this claim'),
       },
@@ -251,7 +251,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
       inputSchema: {
         id: z.string(),
         evidence: z.string().min(1).describe('the finding — what was examined and what showed the claim false, for a reader who was not there'),
-        artifacts: z.array(z.string()).optional().describe('files or directories the finding rests on; paths in the evidence text are pinned automatically'),
+        artifacts: z.array(z.string()).optional().describe('the files or directories the finding rests on; when given, they are the whole pin set — without them a leaf falls back to the paths its evidence names, and a claim with parts pins nothing'),
         round: z.string().optional().describe('the key of the round_record this judgment cites — the change is described there once; the evidence here is one sentence about this claim'),
       },
     },
@@ -315,7 +315,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
       inputSchema: {
         id: z.string(),
         evidence: z.string().min(1).describe('what was examined today — the grounds of the fresh judgment, recorded on the chain'),
-        artifacts: z.array(z.string()).optional().describe('files or directories this evidence rests on; paths in the evidence text are pinned automatically'),
+        artifacts: z.array(z.string()).optional().describe('the files or directories THIS claim rests on; when given, they are the whole pin set — without them a leaf falls back to the paths its evidence names, and a claim with parts pins nothing'),
         round: z.string().optional().describe('the key of the round_record this judgment cites — the change is described there once; the evidence here is one sentence about this claim'),
       },
     },
