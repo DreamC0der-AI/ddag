@@ -5,6 +5,7 @@ import { enabledActions, type Action } from '../../kernel/actions'
 import { Graph } from '../../kernel/graph'
 import { sha256Hex } from '../../kernel/hash'
 import type { NodeId, Op, Snapshot } from '../../kernel/types'
+import { slow } from './slow'
 
 const h = sha256Hex
 
@@ -238,5 +239,5 @@ describe('checkReachability — the fwd theorem as a property', () => {
       }),
       { numRuns: 50 },
     )
-  }, 30000)
+  }, slow(30000))
 })

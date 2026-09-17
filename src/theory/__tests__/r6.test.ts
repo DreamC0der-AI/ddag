@@ -3,6 +3,7 @@ import { canonicalKey, exploreKeys, type Universe } from '../explorer'
 import { checkReachability } from '../checklist'
 import { sha256Hex } from '../../kernel/hash'
 import type { Snapshot } from '../../kernel/types'
+import { slow } from './slow'
 
 const h = sha256Hex
 
@@ -150,7 +151,7 @@ describe('R6 — record cycles, machine verdict', () => {
       expect(reached.has(canonicalKey(S_MISMATCH)), 'mismatched two-cycle must be unreached').toBe(false)
       expect(reached.has(canonicalKey(S_MATCHED)), 'matched two-cycle must be unreached').toBe(false)
     },
-    600000,
+    slow(600000),
   )
 
   it(
@@ -177,6 +178,6 @@ describe('R6 — record cycles, machine verdict', () => {
       expect(reached.has(canonicalKey(S3_CHAIN)), 'acyclic three-chain must be reachable').toBe(true)
       expect(reached.has(canonicalKey(S3_CYCLE)), 'matched three-cycle must be unreached').toBe(false)
     },
-    600000,
+    slow(600000),
   )
 })

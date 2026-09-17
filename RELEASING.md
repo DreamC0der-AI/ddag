@@ -8,7 +8,9 @@ A release is a tag. CI publishes it; nobody types a code.
 3. Push the tag `vX.Y.Z` on the published commit. The **Publish to npm**
    workflow (`.github/workflows/publish.yml`) then refuses a tag that does not
    match `package.json`, runs `npm ci`, the typecheck and the whole test suite,
-   and runs `npm publish`. `prepublishOnly` builds the bundles.
+   and runs `npm publish`. `prepublishOnly` builds the bundles. The theory
+   explorations, a quarter of an hour on a CI runner, run only when `src/kernel`
+   or `src/theory` changed since the previous release tag.
 4. Judge the publish target's leaves on the chain: the GitHub tree, the npm
    tarball's bytes against a local build of the marked commit, the plugin
    listing.

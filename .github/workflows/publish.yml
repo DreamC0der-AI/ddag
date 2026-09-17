@@ -26,9 +26,11 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest # trusted publishing requires a GitHub-hosted runner
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # history and tags, to see what changed since the last release
 
       - uses: actions/setup-node@v6
         with:
@@ -54,7 +56,29 @@ jobs:
 
       - run: npm run typecheck
 
-      - name: Tests (kernel laws, chain, MCP server, dashboard, theory explorations)
+      # The theory explorations model-check the kernel over millions of states: minutes on a
+      # developer machine, a quarter of an hour here. They gate a release only when what they
+      # prove could have moved: the kernel or the theory changed since the previous release tag
+      # (or there is no previous tag yet).
+      - name: Did the kernel or the theory change since the last release?
+        id: scope
+        run: |
+          prev="$(git describe --tags --abbrev=0 --match 'v*' HEAD^ 2>/dev/null || true)"
+          echo "previous release tag: ${prev:-none}"
+          if [ -z "$prev" ] || [ -n "$(git diff --name-only "$prev" HEAD -- src/kernel src/theory)" ]; then
+            echo "theory=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "theory=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Tests (kernel laws, chain, MCP server, dashboard)
+        if: steps.scope.outputs.theory == 'false'
+        run: npx vitest run --exclude 'src/theory/**'
+
+      - name: Tests, with the theory explorations
+        if: steps.scope.outputs.theory == 'true'
+        env:
+          DDAG_TEST_TIMEOUT_SCALE: '5'
         run: npm test
 
       # prepublishOnly builds dist/ddag-mcp.mjs, dist/ddag-dashboard.mjs and dist/dashboard

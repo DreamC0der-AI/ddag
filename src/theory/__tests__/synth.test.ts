@@ -7,6 +7,7 @@ import { enabledActions, type Action } from '../../kernel/actions'
 import { Graph } from '../../kernel/graph'
 import { sha256Hex } from '../../kernel/hash'
 import type { NodeId, Op, Snapshot } from '../../kernel/types'
+import { slow } from './slow'
 
 /** Independent replay: the ops must rebuild the target on a fresh kernel. */
 function rebuilt(target: Snapshot, genesisContent: string, ops: Op[]): boolean {
@@ -39,7 +40,7 @@ describe('synth — the constructive builder', () => {
       }
     }
     expect(built).toBe(passing.length)
-  }, 120000)
+  }, slow(120000))
 
   it('the R4 counterexample state is built: invalid with a matching fingerprint', () => {
     const target: Snapshot = {
@@ -133,5 +134,5 @@ describe('synth — the constructive builder', () => {
       { numRuns: 120 },
     )
     console.log(`walk targets stuck on record cycles (v1 gap): ${stuckCycles}`)
-  }, 60000)
+  }, slow(60000))
 })
