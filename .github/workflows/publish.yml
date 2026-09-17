@@ -1,0 +1,71 @@
+name: Publish to npm
+
+# A release is a tag: pushing vX.Y.Z tests the tagged commit and publishes it to
+# npm through trusted publishing (OIDC) — no token is stored anywhere, and npm
+# attaches a provenance attestation that ties the tarball to this commit.
+# "Run workflow" by hand does everything except the real publish (a dry run).
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Test, build and pack, but publish with --dry-run'
+        type: boolean
+        default: true
+
+permissions:
+  id-token: write # lets npm verify this workflow's identity; required for trusted publishing
+  contents: read
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest # trusted publishing requires a GitHub-hosted runner
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24' # npm >= 11.5.1 and Node >= 22.14 are required for trusted publishing
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+
+      - name: Tool versions
+        run: |
+          node --version
+          npm --version
+
+      - name: The tag names the package version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} does not match package.json version ${version}"
+            exit 1
+          fi
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - name: Tests (kernel laws, chain, MCP server, dashboard, theory explorations)
+        run: npm test
+
+      # prepublishOnly builds dist/ddag-mcp.mjs, dist/ddag-dashboard.mjs and dist/dashboard
+      - name: Publish (dry run)
+        if: github.event_name == 'workflow_dispatch'
+        run: npm publish --access public --dry-run
+
+      - name: Publish
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: npm publish --access public
+
+      - name: Bundle hashes, for comparison with a local build of the same commit
+        if: always()
+        run: sha256sum dist/ddag-mcp.mjs dist/ddag-dashboard.mjs || true
