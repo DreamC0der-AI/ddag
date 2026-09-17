@@ -2,8 +2,10 @@ import { useSyncExternalStore } from 'react'
 import { enabledActions, frontier } from '../kernel/actions'
 import { rankFrontier } from '../kernel/ordering'
 import type { Graph } from '../kernel/graph'
-import type { NodeId, Op } from '../kernel/types'
-import { EventChain, type ChainEvent, type ChainOp } from '../chain/chain'
+import type { NodeId, Op, Snapshot } from '../kernel/types'
+import { EventChain, isRoundOp, type ChainEvent, type ChainOp, type Provenance, type RoundOp } from '../chain/chain'
+import { firstSentence, nodeChain, type NodeEntry } from '../chain/reader'
+import { coneOf, homesOf, mainTarget, projectOf, targetsOf } from '../chain/targets'
 import { discard, merge, revert, substitute } from '../chain/epistemic'
 import { explainEvent, fingerprintIntact, issueText } from '../chain/explain'
 import { opShort } from '../chain/notation'
@@ -70,12 +72,13 @@ export type OperationKind = (typeof OPERATION_KINDS)[number]
 
 /** The epistemic operation a log entry belongs to: its composite marker when present, else its atom. */
 /** A log entry's kind: an epistemic operation, or an issue record (not an operation — the graph is unchanged). */
-export type EntryKind = OperationKind | 'Reverify' | 'Refute' | 'Issue' | 'Close' | 'Version'
+export type EntryKind = OperationKind | 'Reverify' | 'Refute' | 'Issue' | 'Close' | 'Version' | 'Round'
 
 export function kindOfEntry(e: { op: ChainOp; via?: string }): EntryKind {
   if (e.via?.startsWith('Reverify(')) return 'Reverify'
   if (e.via?.startsWith('Refute(')) return 'Refute'
   if (e.op.type === 'version') return 'Version'
+  if (e.op.type === 'round') return 'Round'
   if (e.op.type === 'issue') return e.op.action === 'open' ? 'Issue' : 'Close'
   if (e.via) {
     const name = e.via.slice(0, e.via.indexOf('(') > 0 ? e.via.indexOf('(') : undefined)
@@ -91,6 +94,49 @@ export function kindOfEntry(e: { op: ChainOp; via?: string }): EntryKind {
   }
   return atom[e.op.type]
 }
+
+/** "@abc1234*, 3 artifacts" — the asterisk marks a dirty tree (the label src/mcp/provenance.ts prints). */
+const pinLabel = (p: Provenance): string => {
+  const head = p.head ? `@${p.head.slice(0, 7)}${p.dirty ? '*' : ''}` : 'no-git'
+  return `${head}, ${p.artifacts.length} artifact${p.artifacts.length === 1 ? '' : 's'}`
+}
+
+/** What an event said, cut for a row: the first sentence, the whole text when it is longer, the round it cites. */
+export interface Said {
+  seq: number
+  grounds: string | null
+  /** the whole text, only when the first sentence is not all of it */
+  full: string | null
+  round: string | null
+}
+
+/**
+ * One row of a claim's timeline — the collapsed view src/chain/reader.ts
+ * renders as text (renderNodeChain), kept as data so causes can be chips:
+ * a run of re-anchorings is one row, the reopen/restore noise of
+ * re-anchorings beneath the claim is one last row.
+ */
+export type TimelineRow =
+  | {
+      type: 'entry'
+      seq: number
+      direct: boolean
+      /** what happened, in plain words */
+      what: string
+      /** the other claim of the row: the part, the group, or the claim whose operation caused this */
+      node: NodeId | null
+      /** said after the node: what the event did to this claim's own verdict */
+      tail: string | null
+      via: string | null
+      said: Said | null
+    }
+  | { type: 'run'; first: number; last: number; count: number; items: Said[] }
+  | { type: 'noise'; count: number; last: number }
+
+// the two collapsing rules of renderNodeChain (src/chain/reader.ts), kept word for word
+const isReanchorOf = (e: NodeEntry, id: NodeId): boolean =>
+  e.direct && (e.kind === 'doubted' || e.kind === 'judged') && e.via === `Reverify(${id})`
+const isReanchorNoise = (e: NodeEntry): boolean => !e.direct && (e.cause?.via ?? '').startsWith('Reverify(')
 
 /** Sampling weights per operation kind (renormalized over non-empty kinds). */
 const WEIGHTS: Record<OperationKind, number> = {
@@ -145,14 +191,97 @@ class SimStore {
     return this.feed
   }
 
-  onFrontier(): Set<NodeId> {
-    return new Set(frontier(this.graph))
+  // ---------- targets: the view shows one target's cone at a time ----------
+
+  /** The chosen target's id, or null for the main target; UI state, not chain state. */
+  private target: NodeId | null = null
+  private targetCache: { chain: EventChain; at: number; target: NodeId; cone: Set<NodeId>; homes: Map<NodeId, NodeId> } | null = null
+
+  /** The project node when the chain carries several targets; never shown. */
+  projectNode(): NodeId | null {
+    return projectOf(this.chain)
   }
 
-  /** Frontier ranked by the one-step lookahead — the agent's best next move. */
+  /** Every target in creation order, the main one first; one entry on a legacy chain. */
+  targets(): NodeId[] {
+    return targetsOf(this.chain)
+  }
+
+  /** The target the view is on: the chosen one while it exists, else the main target. */
+  currentTarget(): NodeId {
+    const ts = this.targets()
+    return this.target !== null && ts.includes(this.target) ? this.target : mainTarget(this.chain)
+  }
+
+  /** Pick the target to view; remembered per project in this browser. */
+  selectTarget(id: NodeId | null): void {
+    this.target = id
+    const project = this.liveSource()?.project
+    if (project !== undefined) {
+      try {
+        if (id === null) localStorage.removeItem(`${TARGET_KEY}.${project}`)
+        else localStorage.setItem(`${TARGET_KEY}.${project}`, id)
+      } catch {
+        // per-browser convenience only
+      }
+    }
+    this.emit()
+  }
+
+  /** How a target is named in the toolbar: the main one by its id, a sub-target as project/id. */
+  targetLabel(id: NodeId): string {
+    return id === mainTarget(this.chain) ? id : `${this.liveChainPath()}/${id}`
+  }
+
+  private targetView(): { cone: Set<NodeId>; homes: Map<NodeId, NodeId> } {
+    const at = this.chain.length
+    const target = this.currentTarget()
+    const c = this.targetCache
+    if (c && c.chain === this.chain && c.at === at && c.target === target) return c
+    const view = { chain: this.chain, at, target, cone: coneOf(this.graph, target), homes: homesOf(this.chain) }
+    this.targetCache = view
+    return view
+  }
+
+  /** The current target's cone: every node with a path to it. The whole graph on a legacy chain. */
+  cone(): Set<NodeId> {
+    return this.targetView().cone
+  }
+
+  /** A node's home target — where it is judged; it may be used (linked) elsewhere. */
+  homeOf(id: NodeId): NodeId {
+    return this.targetView().homes.get(id) ?? this.currentTarget()
+  }
+
+  /**
+   * What the canvas draws: the current target's cone with the target as root
+   * and only the arcs inside the cone. On a legacy chain this is the graph.
+   */
+  viewSnapshot(): Snapshot {
+    const snap = this.graph.snapshot()
+    if (this.projectNode() === null) return snap
+    const cone = this.cone()
+    return {
+      root: this.currentTarget(),
+      nodes: snap.nodes.filter((n) => cone.has(n.id)),
+      arcs: snap.arcs.filter((a) => cone.has(a.from) && cone.has(a.to)),
+    }
+  }
+
+  /** Verifiable now, in this target: on the kernel frontier, in the cone, and judged here (not homed elsewhere). */
+  onFrontier(): Set<NodeId> {
+    const front = frontier(this.graph)
+    if (this.projectNode() === null) return new Set(front)
+    const target = this.currentTarget()
+    const { cone, homes } = this.targetView()
+    return new Set(front.filter((id) => cone.has(id) && homes.get(id) === target))
+  }
+
+  /** Frontier ranked by the one-step lookahead — the agent's best next move toward this target. */
   frontierRanks(): Map<NodeId, { n: number; win: boolean; restores: number; unlocks: number }> {
     const m = new Map<NodeId, { n: number; win: boolean; restores: number; unlocks: number }>()
-    rankFrontier(this.graph, { noTrivialWin: true }).forEach((r, i) =>
+    const scoped = this.projectNode() !== null ? { target: this.currentTarget(), only: this.onFrontier() } : {}
+    rankFrontier(this.graph, { noTrivialWin: true, ...scoped }).forEach((r, i) =>
       m.set(r.id, { n: i + 1, win: r.rootSolid, restores: r.restored.length, unlocks: r.unlocked.length }),
     )
     return m
@@ -211,17 +340,120 @@ class SimStore {
   }
 
   /** Why the node exists (its Add rationale) and how it was last judged — read off the chain. */
-  nodeHistory(id: NodeId): { because?: string; judged?: { result: string; evidence?: string } } {
+  nodeHistory(id: NodeId): { because?: string; judged?: { seq: number; result: string; evidence?: string; round?: string; pin?: string } } {
     const events = this.chain.chain()
-    const out: { because?: string; judged?: { result: string; evidence?: string } } = {}
+    const out: ReturnType<SimStore['nodeHistory']> = {}
     for (let i = events.length - 1; i >= 0; i--) {
       const e = events[i]!
-      if (!out.judged && e.op.type === 'verify' && e.op.id === id)
-        out.judged = e.evidence ? { result: e.op.result, evidence: e.evidence } : { result: e.op.result }
+      if (!out.judged && e.op.type === 'verify' && e.op.id === id) {
+        out.judged = { seq: e.seq, result: e.op.result }
+        if (e.evidence) out.judged.evidence = e.evidence
+        if (e.round !== undefined) out.judged.round = e.round
+        if (e.provenance) out.judged.pin = pinLabel(e.provenance)
+      }
       if (!out.because && e.op.type === 'add' && e.op.id === id && e.evidence) out.because = e.evidence
       if (out.judged && out.because) break
     }
     return out
+  }
+
+  /** A round record by its key: the change a judgment cites instead of repeating it. */
+  roundOf(key: string): (RoundOp & { seq: number }) | null {
+    for (const e of this.chain.chain()) if (isRoundOp(e.op) && e.op.key === key) return { ...e.op, seq: e.seq }
+    return null
+  }
+
+  /** A claim's own chain as rows, oldest first, collapsed by the rules of renderNodeChain. */
+  timelineOf(id: NodeId): TimelineRow[] {
+    const events = this.chain.chain()
+    const said = (seq: number): Said => {
+      const ev = events[seq - 1]!
+      const text = (ev.evidence ?? '').replace(/\s+/g, ' ').trim()
+      const first = text === '' ? null : firstSentence(text)
+      return { seq, grounds: first, full: first !== null && first !== text ? text : null, round: ev.round ?? null }
+    }
+    const rows: TimelineRow[] = []
+    let run: Said[] = []
+    let noise = 0
+    let noiseLast = 0
+    const flush = () => {
+      if (run.length === 0) return
+      rows.push({ type: 'run', first: run[0]!.seq, last: run[run.length - 1]!.seq, count: run.length, items: run })
+      run = []
+    }
+    for (const e of nodeChain(this.chain, id)) {
+      if (isReanchorNoise(e)) {
+        noise++
+        noiseLast = e.seq
+        continue
+      }
+      if (isReanchorOf(e, id)) {
+        if (e.kind === 'judged') run.push(said(e.seq)) // the pair is one act; the verify carries it
+        continue
+      }
+      flush()
+      const row = (what: string, o: { node?: NodeId; said?: boolean; effect?: boolean } = {}): void => {
+        rows.push({
+          type: 'entry',
+          seq: e.seq,
+          direct: e.direct,
+          what,
+          node: o.node ?? null,
+          tail: o.effect && e.effect ? (e.effect === 'reopened' ? 'this claim reopened' : 'this claim was restored') : null,
+          via: e.direct ? (e.via ?? null) : (e.cause?.via ?? null),
+          said: o.said ? said(e.seq) : null,
+        })
+      }
+      const ref = e.ref ?? ''
+      const cause = e.cause
+      switch (e.kind) {
+        case 'added':
+          row('added under', { node: ref, said: true })
+          break
+        case 'gained-part':
+          row('gained the part', { node: ref, effect: true })
+          break
+        case 'lost-part':
+          row('lost the part', { node: ref, effect: true })
+          break
+        case 'linked-into':
+          row('linked into', { node: ref })
+          break
+        case 'unlinked-from':
+          row('unlinked from', { node: ref })
+          break
+        case 'restated':
+          row('restated', { said: true, effect: true })
+          break
+        case 'judged':
+          row(`judged ${e.result}`, { said: true })
+          break
+        case 'doubted':
+          row('judgment withdrawn', { said: true })
+          break
+        case 'issue-opened':
+          row(`issue ${ref} opened`)
+          break
+        case 'issue-closed':
+          row(`issue ${ref} closed`)
+          break
+        case 'reopened':
+          row(`reopened by ${cause!.op}`, { node: cause!.node })
+          break
+        case 'restored':
+          row(`restored by ${cause!.op}`, { node: cause!.node })
+          break
+        case 'solid':
+          row(`became solid through ${cause!.op}`, { node: cause!.node })
+          break
+        case 'dropped':
+          row(`dropped by ${cause!.op}`, { node: cause!.node })
+          break
+      }
+    }
+    flush()
+    if (noise > 0) rows.push({ type: 'noise', count: noise, last: noiseLast })
+    return rows
   }
 
   /** Feed entry for one chain event, with its consequences explained from the snapshots. */
@@ -372,6 +604,7 @@ class SimStore {
       this.liveTimer = null
       this.auditTimer = null
       this.audit = {}
+      this.target = null
       this.live = false
       this.emit()
       return
@@ -380,6 +613,16 @@ class SimStore {
     if (!src) return // nothing to mirror
     this.live = true
     this.lastRaw = ''
+    // which target to open on: the link's ?target=, else the one last viewed
+    // here; either is checked against the chain's targets when it arrives
+    this.target = new URLSearchParams(window.location.search).get('target')
+    if (this.target === null && src.project !== undefined) {
+      try {
+        this.target = localStorage.getItem(`${TARGET_KEY}.${src.project}`)
+      } catch {
+        this.target = null
+      }
+    }
     const tick = async () => {
       try {
         const res = await fetch(`${src.url}?t=${Date.now()}`, { cache: 'no-store' })
@@ -538,6 +781,8 @@ class SimStore {
 }
 
 const pick = <T,>(xs: T[]): T => xs[Math.floor(Math.random() * xs.length)]!
+
+const TARGET_KEY = 'ddag.target'
 
 export const store = new SimStore()
 

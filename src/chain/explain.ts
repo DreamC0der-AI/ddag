@@ -8,6 +8,7 @@ import type { ChainOp } from './chain'
 /** Judgments and withdrawals carry evidence; structural decisions carry rationale. */
 export function groundsLabel(op: ChainOp): string {
   if (op.type === 'version') return 'note'
+  if (op.type === 'round') return 'round'
   if (op.type === 'issue') return op.action === 'open' ? 'finding' : 'resolution'
   return op.type === 'verify' || op.type === 'doubt' ? 'evidence' : 'rationale'
 }
@@ -20,6 +21,7 @@ export function groundsLabel(op: ChainOp): string {
  */
 export function issueText(op: ChainOp): string | undefined {
   if (op.type === 'version') return op.note
+  if (op.type === 'round') return op.title
   if (op.type !== 'issue') return undefined
   if (op.action === 'open')
     return `${op.title}${op.severity ? ` [${op.severity}]` : ''}${op.node ? ` — on ${op.node}` : ''}`

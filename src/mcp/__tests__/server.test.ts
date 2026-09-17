@@ -53,6 +53,11 @@ describe('ddag MCP server', () => {
         'version_list',
         'graph_new',
         'graph_open',
+        'target_new',
+        'target_switch',
+        'target_list',
+        'why',
+        'round_record',
       ].sort(),
     )
   })
@@ -68,12 +73,12 @@ describe('ddag MCP server', () => {
     const opened = await call(client, 'graph_open', { path: 'b.json' })
     expect(opened.isError).toBe(false)
     expect(opened.text).toContain('b.json')
-    expect((await call(client, 'graph_state')).text).not.toContain('claim in A')
+    expect((await call(client, 'graph_state', { full: true })).text).not.toContain('claim in A')
     await call(client, 'add', { content: 'claim in B', successor: 'target' })
 
     // switch back — A's state is exactly as left
     await call(client, 'graph_open', { path: 'a.json' })
-    const state = await call(client, 'graph_state')
+    const state = await call(client, 'graph_state', { full: true })
     expect(state.text).toContain('claim in A')
     expect(state.text).toContain('n1 [valid, solid]')
     expect(state.text).not.toContain('claim in B')
@@ -203,6 +208,42 @@ describe('ddag MCP server', () => {
     expect((await call(client, 'graph_audit')).text).toContain('- n1: STALE?')
   })
 
+  it('graph_state is compact by default: one line per node with markers, frontier nodes in full, one node or all on request (TOK-1)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ddag-'))
+    const { writeFileSync } = await import('node:fs')
+    writeFileSync(join(dir, 'lib.ts'), 'v1\n')
+    const client = await connect(new McpStore(join(dir, 'ddag.json'), dir), dir)
+    await call(client, 'add', { id: 'a', content: 'lib works', successor: 'target', verify: 'the lib suite passes' })
+    await call(client, 'add', { id: 'b', content: 'docs ok', successor: 'target' })
+    await call(client, 'verify', { id: 'a', result: 'valid', evidence: 'lib.ts reviewed, 3 tests passed' })
+    await call(client, 'issue_open', { key: 'D-1', title: 'typo', node: 'b' })
+    writeFileSync(join(dir, 'lib.ts'), 'v2\n')
+    const compact = (await call(client, 'graph_state')).text
+    // a settled node is one line, with its markers; its evidence is not printed
+    expect(compact).toContain('- a [valid, solid] · leaf · STALE')
+    expect(compact).not.toContain('lib.ts reviewed, 3 tests passed')
+    // a frontier node is in full
+    expect(compact).toContain('- b [pending] · issues: 1 open · FRONTIER')
+    expect(compact).toContain('    claim: docs ok')
+    expect(compact).toContain('    judged: never')
+    // the group above is one line naming its parts
+    expect(compact).toContain('- target [pending] · parts: a, b')
+    expect(compact).toContain('Root target: broken')
+    // one node in full on request; every node on request
+    const one = (await call(client, 'graph_state', { node: 'a' })).text
+    expect(one).toContain('    verify: the lib suite passes')
+    expect(one).toContain('lib.ts reviewed, 3 tests passed')
+    expect(one).not.toContain('- b [')
+    expect((await call(client, 'graph_state', { node: 'nope' })).text).toContain('does not exist')
+    const full = (await call(client, 'graph_state', { full: true })).text
+    expect(full).toContain('lib.ts reviewed, 3 tests passed')
+    expect(full).toContain('    claim: docs ok')
+    // a judgment reply does not quote the evidence, but keeps the pin
+    const v = await call(client, 'verify', { id: 'b', result: 'invalid', evidence: 'typo on page 2 of docs.md' })
+    expect(v.text).toContain('Applied: Verify(b)=invalid')
+    expect(v.text).not.toContain('typo on page 2')
+  })
+
   it('reverify re-judges in one call; the standing line counts stale judgments and names claims ready to re-verify; a root verify over stale parts is warned', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'ddag-'))
     const { writeFileSync } = await import('node:fs')
@@ -227,7 +268,7 @@ describe('ddag MCP server', () => {
     expect(root.text).toContain('Audit: 1 judgment(s) beneath the root rest on code that changed')
     // one call re-anchors a
     const re = await call(client, 'reverify', { id: 'a', evidence: 'lib.ts re-reviewed on the new version' })
-    expect(re.text).toContain('Applied: Doubt(a) [Reverify(a)] (evidence: lib.ts re-reviewed on the new version); Verify(a)=valid [Reverify(a)] (evidence: lib.ts re-reviewed on the new version) [pinned no-git, 1 artifact]')
+    expect(re.text).toContain('Applied: Doubt(a) [Reverify(a)]; Verify(a)=valid [Reverify(a)] [pinned no-git, 1 artifact]')
     expect(re.text).toContain('Root target: SOLID')
     expect(re.text).not.toContain('Stale:')
     expect((await call(client, 'reverify', { id: 'b', evidence: 'x' })).text).not.toContain('Rejected') // b is valid now → fine
@@ -263,7 +304,7 @@ describe('ddag MCP server', () => {
     expect(audit.text).not.toContain('render')
     // a finding refutes the claim in one call
     const r = await call(client, 'refute', { id: 'lib', evidence: 'parse drops leading spaces the spec keeps — lib.ts' })
-    expect(r.text).toContain('Applied: Doubt(lib) [Refute(lib)] (evidence: parse drops leading spaces the spec keeps — lib.ts); Verify(lib)=invalid [Refute(lib)]')
+    expect(r.text).toContain('Applied: Doubt(lib) [Refute(lib)]; Verify(lib)=invalid [Refute(lib)]')
     expect(r.text).toContain('Root target: broken')
     expect(r.text).toContain('Frontier (best judgment first): lib')
     expect((await call(client, 'refute', { id: 'lib', evidence: 'again' })).text).toContain('Rejected')
@@ -413,7 +454,7 @@ describe('ddag MCP server', () => {
     })
     expect(withCrit.text).not.toContain('no verification criterion')
     await call(client, 'verify', { id: 'b', result: 'valid', evidence: 'Parsed all 40 spec constructs; left recursion handled by the loop form.' })
-    const state = (await call(client, 'graph_state')).text
+    const state = (await call(client, 'graph_state', { full: true })).text
     expect(state).toContain('- b [valid, solid]')
     expect(state).toContain('    claim: grammar is complete')
     expect(state).toContain('    verify: every construct in the spec parses; prediction: left recursion is the risk')
@@ -493,12 +534,13 @@ describe('ddag MCP server', () => {
     expect(state.text).toContain('n1 [pending]') // nothing was recorded
   })
 
-  it('records citations on the chain: narration and history carry them, replay preserves them', async () => {
+  it('records citations on the chain: the reply does not quote them, history carries them, replay preserves them (TOK-2)', async () => {
     const file = tmpFile()
     const client = await connect(new McpStore(file))
     await call(client, 'add', { content: 'claim', successor: 'target' })
     const v = await call(client, 'verify', { id: 'n1', result: 'valid', evidence: 'vitest: 9 passed' })
-    expect(v.text).toContain('(evidence: vitest: 9 passed)')
+    expect(v.text).toContain('Applied: Verify(n1)=valid')
+    expect(v.text).not.toContain('(evidence:')
 
     await call(client, 'doubt', { id: 'n1', evidence: 'suite predates the refactor' })
     const history = await call(client, 'graph_history')
@@ -535,7 +577,7 @@ describe('ddag MCP server', () => {
     await call(client1, 'verify', { id: 'n1', result: 'valid', evidence: 'suite: green' })
 
     const client2 = await connect(new McpStore(file)) // fresh store, same file
-    const state = await call(client2, 'graph_state')
+    const state = await call(client2, 'graph_state', { full: true })
     expect(state.text).toContain('n1 [valid, solid]')
     expect(state.text).toContain('persistent claim')
   })

@@ -34,16 +34,21 @@ export interface RankOptions {
    * A shell policy over the kernel-true frontier, off by default.
    */
   noTrivialWin?: boolean
+  /** The node whose turning solid is the win; the kernel root by default. A target on a multi-target chain. */
+  target?: NodeId
+  /** Rank only these frontier nodes, and count unlocks only among them: a target's cone, minus what other targets judge. */
+  only?: Set<NodeId>
 }
 
 /** Rank the frontier best-first: winning moves, then restore+unlock yield. */
 export function rankFrontier(g: Graph, o: RankOptions = {}): FrontierRank[] {
   const snap = g.snapshot()
+  const target = o.target ?? g.root
   const front = frontier(g).filter(
-    (id) => !(o.noTrivialWin && id === g.root && g.predecessors(g.root).length === 0),
+    (id) => (o.only === undefined || o.only.has(id)) && !(o.noTrivialWin && id === target && g.predecessors(target).length === 0),
   )
   const beforeFront = new Set(front)
-  const rootWasSolid = g.solid(g.root)
+  const rootWasSolid = g.solid(target)
 
   const ranks: FrontierRank[] = front.map((id) => {
     const sim = Graph.fromSnapshot(snap)
@@ -53,8 +58,8 @@ export function rankFrontier(g: Graph, o: RankOptions = {}): FrontierRank[] {
     const restored = sim
       .ids()
       .filter((x) => x !== id && g.verdict(x) !== 'valid' && sim.verdict(x) === 'valid')
-    const unlocked = frontier(sim).filter((x) => !beforeFront.has(x))
-    return { id, restored, unlocked, rootSolid: !rootWasSolid && sim.solid(sim.root) }
+    const unlocked = frontier(sim).filter((x) => !beforeFront.has(x) && (o.only === undefined || o.only.has(x)))
+    return { id, restored, unlocked, rootSolid: !rootWasSolid && sim.solid(target) }
   })
 
   ranks.sort((a, b) => {

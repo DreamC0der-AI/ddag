@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs'
+import { coneOf, mainTarget, projectOf, targetsOf } from '../chain/targets'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { extname, join, resolve, sep } from 'node:path'
 import { EventChain, type ChainDump } from '../chain/chain'
@@ -21,6 +22,8 @@ export interface ProjectSummary extends ProjectEntry {
   rootId?: string
   rootClaim?: string
   rootSolid?: boolean
+  /** every target on a multi-target chain, the main one first; absent on a legacy chain */
+  targets?: { id: string; solid: boolean; frontier: number; nodes: number }[]
   frontier?: number
   events?: number
   lastEvent?: string
@@ -69,13 +72,21 @@ export function summarize(entry: ProjectEntry): ProjectSummary {
     const g = chain.graph
     const events = chain.chain()
     const last = events[events.length - 1]
+    const main = mainTarget(chain)
+    const project = projectOf(chain)
+    const front = new Set(frontier(g))
+    const perTarget = targetsOf(chain).map((id) => {
+      const cone = coneOf(g, id)
+      return { id, solid: g.solid(id), frontier: [...cone].filter((n) => front.has(n)).length, nodes: cone.size }
+    })
     return {
       ...entry,
       exists: true,
-      rootId: g.root,
-      rootClaim: g.node(g.root).content.split('\n')[0],
-      rootSolid: g.solid(g.root),
-      frontier: frontier(g).length,
+      rootId: main,
+      rootClaim: g.node(main).content.split('\n')[0],
+      rootSolid: g.solid(main),
+      frontier: perTarget[0]!.frontier,
+      ...(project !== null ? { targets: perTarget } : {}),
       events: events.length,
       lastEvent: last ? opNotation(last.op) : undefined,
       stale: auditFor(entry, chain).summary.stale,

@@ -190,10 +190,17 @@ export function collectProvenance(
   explicit: readonly string[],
   root: string,
   chainFile?: string,
+  opts: { group?: boolean } = {},
 ): Collected {
-  const cited = citedPaths(evidence, root)
+  // PIN-2: a judgment pins what it was given. Explicit artifacts, when present, are the whole pin
+  // set; a claim with parts rests on its parts and pins nothing from its prose; only a leaf judged
+  // without explicit artifacts falls back to the paths its evidence names.
+  const fromProse = explicit.length === 0 && opts.group !== true
+  const cited = fromProse ? citedPaths(evidence, root) : { paths: [] as string[], warnings: [] as string[] }
   const paths = new Set<string>(cited.paths)
   const warnings = [...cited.warnings]
+  if (opts.group === true && explicit.length === 0 && citedPaths(evidence, root).paths.length > 0)
+    warnings.push('a claim with parts rests on its parts — the paths in its evidence were not pinned; pass artifacts to pin one deliberately')
   for (const p of explicit) {
     const abs = resolve(root, p)
     if (inside(root, abs) && existsSync(abs)) {

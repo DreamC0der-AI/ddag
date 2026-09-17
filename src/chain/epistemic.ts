@@ -21,15 +21,15 @@ import type { EventChain, Provenance } from './chain'
  * the kernel refuses leaves the doubt on the record: the withdrawal was
  * honest even if the re-judgment could not land.
  */
-export function reverify(chain: EventChain, id: NodeId, evidence: string, provenance?: Provenance): Result {
+export function reverify(chain: EventChain, id: NodeId, evidence: string, provenance?: Provenance, round?: string): Result {
   const g = chain.graph
   if (!g.has(id)) return { ok: false, error: `node "${id}" does not exist` }
   if (g.verdict(id) !== 'valid')
     return { ok: false, error: `node "${id}" is ${g.verdict(id)} — reverify re-judges a valid claim; use verify` }
   const via = `Reverify(${id})`
-  const d = chain.dispatch({ type: 'doubt', id }, via, evidence)
+  const d = chain.dispatch({ type: 'doubt', id }, via, evidence, undefined, round)
   if (!d.ok) return d
-  return chain.dispatch({ type: 'verify', id, result: 'valid' }, via, evidence, provenance)
+  return chain.dispatch({ type: 'verify', id, result: 'valid' }, via, evidence, provenance, round)
 }
 
 /**
@@ -39,15 +39,15 @@ export function reverify(chain: EventChain, id: NodeId, evidence: string, proven
  * reopen and stay reopened: the tower above a refuted claim is honestly
  * pending until the claim is repaired and re-judged.
  */
-export function refute(chain: EventChain, id: NodeId, evidence: string, provenance?: Provenance): Result {
+export function refute(chain: EventChain, id: NodeId, evidence: string, provenance?: Provenance, round?: string): Result {
   const g = chain.graph
   if (!g.has(id)) return { ok: false, error: `node "${id}" does not exist` }
   if (g.verdict(id) !== 'valid')
     return { ok: false, error: `node "${id}" is ${g.verdict(id)} — refute withdraws a valid claim; use verify(invalid)` }
   const via = `Refute(${id})`
-  const d = chain.dispatch({ type: 'doubt', id }, via, evidence)
+  const d = chain.dispatch({ type: 'doubt', id }, via, evidence, undefined, round)
   if (!d.ok) return d
-  return chain.dispatch({ type: 'verify', id, result: 'invalid' }, via, evidence, provenance)
+  return chain.dispatch({ type: 'verify', id, result: 'invalid' }, via, evidence, provenance, round)
 }
 
 /**

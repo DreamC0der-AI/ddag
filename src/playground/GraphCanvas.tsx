@@ -35,6 +35,8 @@ interface SimNodeData extends Record<string, unknown> {
   stale: { changed: string[]; missing: string[]; detail?: string[] } | null
   /** recorded issues on this claim: open keys and closed count */
   issue: { open: string[]; closed: number } | null
+  /** targets: this node is judged in another target (its home) and only used here */
+  home: string | null
 }
 
 type SimRFNode = Node<SimNodeData, 'sim'>
@@ -101,6 +103,11 @@ function SimNodeView({ id, data }: NodeProps<SimRFNode>) {
         )}
       </div>
       <Handle type="source" position={Position.Bottom} className="hidden-handle" />
+      {data.home && (
+        <span className="home-chip" title={`judged in target ${data.home} — used here, not verifiable here`}>
+          home: {data.home}
+        </span>
+      )}
     </div>
   )
 }
@@ -150,9 +157,10 @@ export function GraphCanvas({ selected, onSelect }: CanvasProps) {
   const centersRef = useRef(new Map<string, { x: number; y: number }>())
   const pinnedRef = useRef(new Map<string, { x: number; y: number }>())
 
+  // one target's cone at a time: the target is the root, other targets' nodes are absent
   const { snap, structureKey } = useMemo(() => {
-    const snap = sim.graph.snapshot()
-    return { snap, structureKey: JSON.stringify([snap.nodes.map((n) => n.id), snap.arcs]) }
+    const snap = sim.viewSnapshot()
+    return { snap, structureKey: JSON.stringify([snap.root, snap.nodes.map((n) => n.id), snap.arcs]) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [version])
 
@@ -170,6 +178,7 @@ export function GraphCanvas({ selected, onSelect }: CanvasProps) {
     const g = sim.graph
     const front = sim.onFrontier()
     const ranks = sim.frontierRanks()
+    const target = snap.root
     const nodes: SimRFNode[] = snap.nodes.map((n) => {
       const c = centersRef.current.get(n.id) ?? centers.get(n.id)!
       return {
@@ -205,6 +214,10 @@ export function GraphCanvas({ selected, onSelect }: CanvasProps) {
               missing: a.missing,
               ...(a.diffs && a.diffs.length > 0 ? { detail: a.diffs.map(describeDiff) } : {}),
             }
+          })(),
+          home: (() => {
+            const h = sim.homeOf(n.id)
+            return h === target ? null : sim.targetLabel(h)
           })(),
         },
         draggable: true,

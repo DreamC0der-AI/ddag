@@ -320,3 +320,28 @@
   ```
 
   A consumer that wants to know what an event changed (e.g. UI coloring, dropped nodes) diffs the snapshots before and after the event.
+
+  ## Targets
+
+  A target is a reading of the shape, not a kernel notion. A chain carries either one target — the kernel root, as everywhere above — or several: then the kernel root is a *project node*, recorded in the dump's `meta.project`, that no shell shows or judges, and the targets are its direct parts in creation order, the first being the main target. A forest of sinks is the same shape as one root whose parts are the sinks, so I1–I3, the survival rule, Restore and the reachability results hold unchanged; the project node is simply a root that stays pending forever.
+
+  Derived, never stored:
+  - `cone(t)` — every node with a path to target t, t included. A target's standing is `solid(t)`; its frontier is `frontier(G) ∩ cone(t)`, restricted to the nodes it judges.
+  - `home(n)` — the target n was created under: read off the add events (a node added under the project node is a target and its own home), and re-homed to the first target it still reaches when it no longer reaches its home (a subtree moved between targets). The project node has no home.
+
+  A node may sit in several cones — linked from its home into another target as a part — and is *judged in its home only*; elsewhere it is used, and the whole above it reopens when it changes exactly as for any part. The shells enforce this: judgment and restatement of n are accepted only when the current target is `home(n)`, and structure (add, link, unlink) lands only inside the current target's cone.
+
+  Migration: a single-target chain becomes a project chain by rewriting the dump's initial snapshot into a keyframe — the project node with the old root as its part — and setting `meta.project`; the events replay unchanged, since none names the project node. Every state reachable from the keyframe is reachable from a plain genesis by one add. Promoting an existing claim to a target is the composite `Target(a)`: link `a` under the project node, then unlink it from every whole it was a part of; its subtree keeps every judgment and is re-homed to it, and the former wholes reopen through T1.
+
+  ## Node chains
+
+  The log is one total order because replay and the multi-session fast-forward need one; causally it is a partial order — events on unrelated cones commute. A node's chain is the projection of the log onto one claim: *direct* entries for the events whose operation names it (added, gained or lost a part, restated, judged, doubted, an issue opened or closed on it) and *indirect* entries for the events whose consequences reached it (reopened, restored, became solid, dropped), each indirect entry carrying the seq and node of the operation that caused it. It is derived in one pass over the snapshots the chain already holds (`src/chain/reader.ts`), cached by chain length, and never stored: the log stays the truth and the index cannot drift from it. The last entry of a node's chain is its last change; its last `judged` entry is when it was judged — no separate counters exist.
+
+  The shells read through it: a claim's own history, a target's (the union over its cone), what happened after a position (every reply's standing line ends with the chain's position, `at #N`), and the causal slice behind a claim's state (`why`). Evidence is shown as its first sentence; a Doubt+Verify pair under one composite label is one line; a run of re-anchorings of a claim collapses to one line; and the reopen-and-restore noise that re-anchorings beneath a group leave on it is counted, not listed.
+
+  ## Rounds and pins
+
+  A *round* is a record beside issues and versions: a change described once — what moved, how it was checked. Judgments re-anchored after it carry its key (`round` on the event) and say one sentence about their own claim. Inert to the kernel; a duplicate key is refused; a judgment citing an unrecorded round is refused.
+
+  A judgment pins what it was given: explicit artifacts, when present, are the whole pin set; a claim with parts rests on its parts and pins nothing from its prose; only a leaf judged without explicit artifacts falls back to the paths its evidence names. (Found on this repository's chain: a shared paragraph in every re-anchoring had pinned each judgment to eighteen files on average, so any edit staled nearly all of them.)
+

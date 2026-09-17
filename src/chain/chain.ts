@@ -20,6 +20,8 @@ export interface ChainEvent {
   via?: string
   evidence?: string
   provenance?: Provenance
+  /** the key of the round record this judgment cites: what moved and how it was checked, said once */
+  round?: string
 }
 
 /**
@@ -68,13 +70,28 @@ export interface VersionOp {
   note?: string
 }
 
-/** What a chain event can carry: a kernel operation, or a record (issue, version). */
-export type ChainOp = Op | IssueOp | VersionOp
+/**
+ * A round record: a change described once — what moved and how it was
+ * checked (the diff in words, the suite result) — so that the judgments
+ * re-anchored after it cite it by key and say one sentence about their own
+ * claim, instead of each repeating the round (EVID-1). A record like an
+ * issue or a version: inert to the kernel, no lifecycle.
+ */
+export interface RoundOp {
+  type: 'round'
+  key: string
+  title: string
+  detail?: string
+}
+
+/** What a chain event can carry: a kernel operation, or a record (issue, version, round). */
+export type ChainOp = Op | IssueOp | VersionOp | RoundOp
 
 export const isIssueOp = (op: ChainOp): op is IssueOp => op.type === 'issue'
 export const isVersionOp = (op: ChainOp): op is VersionOp => op.type === 'version'
+export const isRoundOp = (op: ChainOp): op is RoundOp => op.type === 'round'
 /** Records are events the kernel never sees: the snapshot after one is the snapshot before it. */
-export const isRecordOp = (op: ChainOp): op is IssueOp | VersionOp => op.type === 'issue' || op.type === 'version'
+export const isRecordOp = (op: ChainOp): op is IssueOp | VersionOp | RoundOp => op.type === 'issue' || op.type === 'version' || op.type === 'round'
 
 /**
  * Where a judgment was made: the code state its evidence was gathered
@@ -100,10 +117,19 @@ export interface Rejection {
   error: string
 }
 
+/**
+ * Chain-level environment data: the id of the project node when the chain
+ * carries several targets (src/chain/targets.ts). Inert to the kernel.
+ */
+export interface ChainMeta {
+  project: NodeId
+}
+
 /** Serialized form: the initial snapshot plus the chain fully determine the graph. */
 export interface ChainDump {
   initial: Snapshot
   events: ChainEvent[]
+  meta?: ChainMeta
 }
 
 /**
@@ -118,14 +144,21 @@ export class EventChain {
   private readonly events: ChainEvent[] = []
   private readonly snapshots: Snapshot[] = [] // snapshots[i] = state after events[i]
   private readonly rejections: Rejection[] = []
+  private readonly meta: ChainMeta | undefined
 
-  private constructor(g: Graph) {
+  private constructor(g: Graph, meta?: ChainMeta) {
     this.g = g
     this.initial = g.snapshot()
+    this.meta = meta
   }
 
   static create(root: NodeId, rootContent: string): EventChain {
     return new EventChain(new Graph(root, rootContent))
+  }
+
+  /** The project node's id when this chain carries several targets; undefined on a single-target chain. */
+  get project(): NodeId | undefined {
+    return this.meta?.project
   }
 
   /** Query-only access to the live graph. Mutate via dispatch(), never graph.apply(). */
@@ -137,9 +170,15 @@ export class EventChain {
     return this.events.length
   }
 
-  dispatch(op: ChainOp, via?: string, evidence?: string, provenance?: Provenance): Result {
+  dispatch(op: ChainOp, via?: string, evidence?: string, provenance?: Provenance, round?: string): Result {
     if (isIssueOp(op)) return this.recordIssue(op, evidence)
     if (isVersionOp(op)) return this.recordVersion(op, evidence)
+    if (isRoundOp(op)) return this.recordRound(op)
+    if (round !== undefined && !this.events.some((e) => isRoundOp(e.op) && e.op.key === round)) {
+      const error = `round "${round}" is not recorded — round_record it first`
+      this.rejections.push({ op, error })
+      return { ok: false, error }
+    }
     const result = this.g.apply(op)
     if (result.ok) {
       const seq = this.events.length + 1
@@ -147,6 +186,7 @@ export class EventChain {
       if (via !== undefined) ev.via = via
       if (evidence !== undefined) ev.evidence = evidence
       if (provenance !== undefined) ev.provenance = provenance
+      if (round !== undefined) ev.round = round
       this.events.push(ev)
       this.snapshots.push(this.g.snapshot())
     } else {
@@ -172,7 +212,17 @@ export class EventChain {
     return { ok: true }
   }
 
-  private appendRecord(op: IssueOp | VersionOp, evidence?: string): void {
+  private recordRound(op: RoundOp): Result {
+    if (this.events.some((e) => isRoundOp(e.op) && e.op.key === op.key)) {
+      const error = `round "${op.key}" is already recorded`
+      this.rejections.push({ op, error })
+      return { ok: false, error }
+    }
+    this.appendRecord(op)
+    return { ok: true }
+  }
+
+  private appendRecord(op: IssueOp | VersionOp | RoundOp, evidence?: string): void {
     const seq = this.events.length + 1
     const ev: ChainEvent = { seq, prev: seq - 1, op }
     if (evidence !== undefined) ev.evidence = evidence
@@ -228,7 +278,9 @@ export class EventChain {
 
   /** Serialize: initial snapshot + chain (per-event snapshots are rebuilt on load). */
   dump(): ChainDump {
-    return { initial: this.initial, events: [...this.events] }
+    const d: ChainDump = { initial: this.initial, events: [...this.events] }
+    if (this.meta !== undefined) d.meta = { ...this.meta }
+    return d
   }
 
   /**
@@ -238,11 +290,11 @@ export class EventChain {
    * itself be mid-history (a keyframe): it is loaded verbatim, not recomputed.
    */
   static replay(dump: ChainDump): EventChain {
-    const chain = new EventChain(Graph.fromSnapshot(dump.initial))
+    const chain = new EventChain(Graph.fromSnapshot(dump.initial), dump.meta === undefined ? undefined : { ...dump.meta })
     for (const [i, ev] of dump.events.entries()) {
       if (ev.seq !== i + 1 || ev.prev !== i)
         throw new Error(`replay: chain broken at index ${i} (seq ${ev.seq}, prev ${ev.prev})`)
-      const r = chain.dispatch(ev.op, ev.via, ev.evidence, ev.provenance)
+      const r = chain.dispatch(ev.op, ev.via, ev.evidence, ev.provenance, ev.round)
       if (!r.ok) throw new Error(`replay: event seq ${ev.seq} rejected: ${r.error}`)
     }
     return chain

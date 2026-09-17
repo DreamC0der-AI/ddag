@@ -48,6 +48,9 @@ DISCIPLINES:
 - Findings are recorded, not just judged: when an audit, a review or a failing check finds something wrong, issue_open records it with its full detail (key, title, severity, the claim it concerns) so it shows on the dashboard's issue pane; judge the refuted claim invalid as well. A fix closes the issue (issue_close, outcome fixed, what changed) and re-verifies the claim. Never add a "bug" node — a bug is not a part of correctness. issue_list is the fixer's worklist; the standing line counts open issues.
 - A working version is a record too: after the commit that concludes it, version_mark names it (v0.3) with a note; version_list shows every version with what the chain said of it then. Mark after committing, not before.
 - A target that ships has two standing parts besides its build, added PENDING at decomposition time and written into the root's own criterion: an audit decomposed by property (AUDITING above), and a WALKTHROUGH — "a new user with only the README can do everything the README says". Verifying the root over their absence verifies "built", not "done"; their pending leaves on the frontier are the honest signal.
+- READ ONE CLAIM, NOT THE LOG: before re-judging a claim, graph_history {node} gives its own chain in a few lines; why {id} says what broke it; graph_history {since: N} catches up from the position the last standing line ended with ("at #N").
+- ROUNDS: after a change that stales several judgments, round_record it ONCE (what moved, how it was checked), then reverify each claim with round: <key> and ONE sentence about that claim, passing artifacts with the files THAT claim rests on — never the round's file list, never a shared paragraph. Explicit artifacts are the whole pin set; a claim with parts pins none.
+- TARGETS: one chain, one main target (graph_new), and sub-targets for pipelines that consume the build rather than belong to it (publish, deploy) — target_new, target_switch, target_list. A sub-target is never a part of the main target: its wait must not read as the build being broken. A claim is judged in one home target and only used, by link, in another.
 - WALKTHROUGH: a claim, not a mechanism. The group is the README promise; each journey a real user takes is a leaf (install from a clean clone; first project to a solid root; a change that goes stale; an audit by the protocol; an issue opened and closed; a version marked), plus one leaf per tool or panel the journeys do not reach. Each leaf's Verify: names the observed outcome that counts. The tester session has NO source access, uses only the real interface (the tool over stdio, the dashboard, the binary) in a clean folder, and records: a journey that works is verified valid with the transcript written to a file and cited as evidence; one that breaks is refuted and issue_open records the exact steps and output; confusing-but-works is an issue at Low. The tester never fixes. Its workload is its own project with its own chain; the judgments go on the product's chain.
 - One project, one chain: everything about a folder — its build, its audits, its fixes — goes on the folder's ddag.json. Do not graph_new or graph_open a second chain for a sub-effort; add the sub-effort as a part of the root.
 - The root cannot be verified while undecomposed (P1) — decompose first.
@@ -113,12 +116,16 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
         verify: VERIFY_PARAM,
       },
     },
-    async ({ content, successor, id, rationale, verify }) =>
-      withCriterionNote(
+    async ({ content, successor, id, rationale, verify }) => {
+      store.refresh()
+      const out = store.notInCone(successor, 'successor')
+      if (out) return text({ ok: false, text: out })
+      return withCriterionNote(
         store.dispatch({ type: 'add', id: id ?? store.mintId(), content: composeClaim(content, verify), successor }, rationale),
         verify,
         content,
-      ),
+      )
+    },
   )
 
   server.registerTool(
@@ -134,7 +141,13 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
         rationale: z.string().optional().describe('why this decision — recorded on the chain'),
       },
     },
-    async ({ from, to, rationale }) => text(store.dispatch({ type: 'link', from, to }, rationale)),
+    async ({ from, to, rationale }) => {
+      store.refresh()
+      if (to === store.project()) return text({ ok: false, text: 'Refused: targets are added with target_new, not by linking to the project node' })
+      const out = store.notInCone(to, 'whole')
+      if (out) return text({ ok: false, text: out })
+      return text(store.dispatch({ type: 'link', from, to }, rationale))
+    },
   )
 
   server.registerTool(
@@ -150,7 +163,13 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
         rationale: z.string().optional().describe('why this decision — recorded on the chain'),
       },
     },
-    async ({ from, to, rationale }) => text(store.dispatch({ type: 'unlink', from, to }, rationale)),
+    async ({ from, to, rationale }) => {
+      store.refresh()
+      if (to === store.project()) return text({ ok: false, text: `Refused: "${from}" is a target — a target is not unlinked from the project node` })
+      const out = store.notInCone(to, 'whole')
+      if (out) return text({ ok: false, text: out })
+      return text(store.dispatch({ type: 'unlink', from, to }, rationale))
+    },
   )
 
   server.registerTool(
@@ -167,8 +186,12 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
         verify: VERIFY_PARAM,
       },
     },
-    async ({ id, content, rationale, verify }) =>
-      withCriterionNote(store.dispatch({ type: 'mutate', id, content: composeClaim(content, verify) }, rationale), verify, content),
+    async ({ id, content, rationale, verify }) => {
+      store.refresh()
+      const out = store.notHome(id)
+      if (out) return text({ ok: false, text: out })
+      return withCriterionNote(store.dispatch({ type: 'mutate', id, content: composeClaim(content, verify) }, rationale), verify, content)
+    },
   )
 
   server.registerTool(
@@ -191,22 +214,25 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
           .describe(
             'files or directories this evidence rests on (paths under the project root); pinned by content hash so graph_audit can tell when they change. Paths mentioned in the evidence text are pinned automatically',
           ),
+        round: z.string().optional().describe('the key of the round_record this judgment cites — the change is described there once; the evidence here is one sentence about this claim'),
       },
     },
-    async ({ id, result, evidence, artifacts }) => {
+    async ({ id, result, evidence, artifacts, round }) => {
       store.refresh() // judge the caught-up graph: another session may have decomposed since
       const g = store.graph
-      if (id === g.root && g.predecessors(g.root).length === 0) {
+      const home = store.notHome(id)
+      if (home) return text({ ok: false, text: home })
+      if (id === store.target() && g.predecessors(id).length === 0) {
         return text({
           ok: false,
           text: 'Refused (doctrine P1, no trivial win): the root is undecomposed — verifying it bare would end the game without a single part on the record. Add its parts first.',
         })
       }
-      const { provenance, warnings: raw } = collectProvenance(evidence, artifacts ?? [], store.root, store.file)
+      const { provenance, warnings: raw } = collectProvenance(evidence, artifacts ?? [], store.root, store.file, { group: g.has(id) && g.predecessors(id).length > 0 })
       const warnings = partsAware(raw, g.has(id) ? g.predecessors(id).length : 0, provenance.artifacts.length)
-      const staleBelow = id === g.root && result === 'valid' ? store.staleCount() : 0
+      const staleBelow = id === store.target() && result === 'valid' ? store.staleCount() : 0
       const nudge = result === 'invalid' ? groupNudge(store, id, 'refutation') : store.selfFixNudge(id)
-      const r = store.dispatch({ type: 'verify', id, result }, evidence, provenance)
+      const r = store.dispatch({ type: 'verify', id, result }, evidence, provenance, round)
       if (r.ok && nudge) r.text += `\n${nudge}`
       if (r.ok && warnings.length > 0) r.text += `\nProvenance: ${warnings.join('; ')}`
       if (r.ok && staleBelow > 0)
@@ -226,13 +252,17 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
         id: z.string(),
         evidence: z.string().min(1).describe('the finding — what was examined and what showed the claim false, for a reader who was not there'),
         artifacts: z.array(z.string()).optional().describe('files or directories the finding rests on; paths in the evidence text are pinned automatically'),
+        round: z.string().optional().describe('the key of the round_record this judgment cites — the change is described there once; the evidence here is one sentence about this claim'),
       },
     },
-    async ({ id, evidence, artifacts }) => {
+    async ({ id, evidence, artifacts, round }) => {
       store.refresh()
-      const { provenance, warnings } = collectProvenance(evidence, artifacts ?? [], store.root, store.file)
+      const home = store.notHome(id)
+      if (home) return text({ ok: false, text: home })
+      const { provenance, warnings: raw } = collectProvenance(evidence, artifacts ?? [], store.root, store.file, { group: store.graph.has(id) && store.graph.predecessors(id).length > 0 })
+      const warnings = partsAware(raw, store.graph.has(id) ? store.graph.predecessors(id).length : 0, provenance.artifacts.length)
       const nudge = groupNudge(store, id, 'refutation')
-      const r = store.perform((chain) => refute(chain, id, evidence, provenance))
+      const r = store.perform((chain) => refute(chain, id, evidence, provenance, round))
       if (r.ok && warnings.length > 0) r.text += `\nProvenance: ${warnings.join('; ')}`
       if (r.ok && nudge) r.text += `\n${nudge}`
       return text(r)
@@ -262,6 +292,8 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
     },
     async ({ node, parts }) => {
       store.refresh()
+      const out = store.notHome(node)
+      if (out) return text({ ok: false, text: out })
       const r = store.perform((chain) =>
         restructure(
           chain,
@@ -284,13 +316,17 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
         id: z.string(),
         evidence: z.string().min(1).describe('what was examined today — the grounds of the fresh judgment, recorded on the chain'),
         artifacts: z.array(z.string()).optional().describe('files or directories this evidence rests on; paths in the evidence text are pinned automatically'),
+        round: z.string().optional().describe('the key of the round_record this judgment cites — the change is described there once; the evidence here is one sentence about this claim'),
       },
     },
-    async ({ id, evidence, artifacts }) => {
+    async ({ id, evidence, artifacts, round }) => {
       store.refresh()
-      const { provenance, warnings } = collectProvenance(evidence, artifacts ?? [], store.root, store.file)
+      const home = store.notHome(id)
+      if (home) return text({ ok: false, text: home })
+      const { provenance, warnings: raw } = collectProvenance(evidence, artifacts ?? [], store.root, store.file, { group: store.graph.has(id) && store.graph.predecessors(id).length > 0 })
+      const warnings = partsAware(raw, store.graph.has(id) ? store.graph.predecessors(id).length : 0, provenance.artifacts.length)
       const selfFix = store.selfFixNudge(id)
-      const r = store.perform((chain) => reverify(chain, id, evidence, provenance))
+      const r = store.perform((chain) => reverify(chain, id, evidence, provenance, round))
       if (r.ok && warnings.length > 0) r.text += `\nProvenance: ${warnings.join('; ')}`
       if (r.ok && selfFix) r.text += `\n${selfFix}`
       return text(r)
@@ -309,7 +345,12 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
         evidence: z.string().optional().describe('why trust was withdrawn (recorded on the chain)'),
       },
     },
-    async ({ id, evidence }) => text(store.dispatch({ type: 'doubt', id }, evidence)),
+    async ({ id, evidence }) => {
+      store.refresh()
+      const out = store.notHome(id)
+      if (out) return text({ ok: false, text: out })
+      return text(store.dispatch({ type: 'doubt', id }, evidence))
+    },
   )
 
   server.registerTool(
@@ -324,7 +365,12 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
         rationale: z.string().optional().describe('why this decision — recorded on the chain'),
       },
     },
-    async ({ id, rationale }) => text(store.perform((chain) => revert(chain, id, rationale))),
+    async ({ id, rationale }) => {
+      store.refresh()
+      const out = store.notHome(id)
+      if (out) return text({ ok: false, text: out })
+      return text(store.perform((chain) => revert(chain, id, rationale)))
+    },
   )
 
   server.registerTool(
@@ -339,7 +385,13 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
         rationale: z.string().optional().describe('why this decision — recorded on the chain'),
       },
     },
-    async ({ id, rationale }) => text(store.perform((chain) => discard(chain, id, rationale))),
+    async ({ id, rationale }) => {
+      store.refresh()
+      if (store.targets().includes(id)) return text({ ok: false, text: `Refused: "${id}" is a target — targets live on; discard the claims under it instead` })
+      const out = store.notHome(id)
+      if (out) return text({ ok: false, text: out })
+      return text(store.perform((chain) => discard(chain, id, rationale)))
+    },
   )
 
   server.registerTool(
@@ -356,7 +408,12 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
         rationale: z.string().optional().describe('why this decision — recorded on the chain'),
       },
     },
-    async ({ y, x, z: zz, rationale }) => text(store.perform((chain) => substitute(chain, y, x, zz, rationale))),
+    async ({ y, x, z: zz, rationale }) => {
+      store.refresh()
+      const out = store.notInCone(y, 'whole')
+      if (out) return text({ ok: false, text: out })
+      return text(store.perform((chain) => substitute(chain, y, x, zz, rationale)))
+    },
   )
 
   server.registerTool(
@@ -372,7 +429,12 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
         rationale: z.string().optional().describe('why this decision — recorded on the chain'),
       },
     },
-    async ({ dup, canon, rationale }) => text(store.perform((chain) => merge(chain, dup, canon, rationale))),
+    async ({ dup, canon, rationale }) => {
+      store.refresh()
+      const out = store.notHome(dup) ?? store.notHome(canon)
+      if (out) return text({ ok: false, text: out })
+      return text(store.perform((chain) => merge(chain, dup, canon, rationale)))
+    },
   )
 
   server.registerTool(
@@ -381,10 +443,13 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
       title: 'Graph state',
       description:
-        'Full report: every node (verdict, solidity, claim, parts, fingerprint status), root standing, and the frontier — the complete worklist of what can be verified right now.',
-      inputSchema: {},
+        'The graph as a worklist: one line per node (verdict, solidity, parts, STALE / open-issue / FRONTIER markers), the frontier nodes in full (claim, criterion, rationale, last judgment), and the standing line. Pass `node` for one node in full, or `full: true` for every node in full.',
+      inputSchema: {
+        node: z.string().optional().describe('show this one node in full'),
+        full: z.boolean().optional().describe('show every node in full (long on a large graph)'),
+      },
     },
-    async () => ({ content: [{ type: 'text' as const, text: store.stateReport() }] }),
+    async ({ node, full }) => ({ content: [{ type: 'text' as const, text: store.stateReport({ node, full }) }] }),
   )
 
   server.registerTool(
@@ -511,14 +576,46 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
       title: 'Graph history',
       description:
-        'The event chain (most recent events): every applied operation in notation, with epistemic-operation markers. The chain is append-only, replayable history — decisions and their expansions.',
+        'The event chain, read selectively. `node`: that one claim\'s own chain — the events that named it and the ones that reached it (reopened, restored), each with the operation that caused it, re-anchoring runs collapsed; read it before re-judging a claim. `cone`: only the current target\'s events. `since`: only events after that position (the standing line ends with the chain\'s position, "at #N") — the cheap way to catch up. Default: the last `limit` events. Evidence shows as its first sentence; `full` gives whole texts.',
       inputSchema: {
         limit: z.number().int().min(1).max(200).optional().describe('default 30'),
+        node: z.string().optional().describe("one claim's own chain"),
+        cone: z.boolean().optional().describe("only the current target's events"),
+        since: z.number().int().min(0).optional().describe('only events after this position'),
+        full: z.boolean().optional().describe('whole evidence texts instead of first sentences'),
       },
     },
-    async ({ limit }) => ({
-      content: [{ type: 'text' as const, text: store.historyReport(limit ?? 30) }],
+    async ({ limit, node, cone, since, full }) => ({
+      content: [{ type: 'text' as const, text: store.historyReport({ limit, node, cone, since, full }) }],
     }),
+  )
+
+  server.registerTool(
+    'why',
+    {
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      title: 'Why — the causal slice behind a claim\'s state',
+      description:
+        'Why a claim is valid, pending or invalid right now, in a few lines: what it was last judged on, or the event that reopened it and the claim that event was about, or the parts it is waiting on. The answer to "what broke this?" without reading the log.',
+      inputSchema: { id: z.string().min(1) },
+    },
+    async ({ id }) => ({ content: [{ type: 'text' as const, text: store.whyReport(id) }] }),
+  )
+
+  server.registerTool(
+    'round_record',
+    {
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      title: 'Record a round — a change described once',
+      description:
+        'Before re-anchoring several judgments after one change, record the change ONCE: what moved (files, functions, in words) and how it was checked (the suite result). Then pass its key as `round` to each verify / reverify / refute, whose evidence is ONE sentence about that claim — never the round again. A record like an issue or a version: the graph is unchanged.',
+      inputSchema: {
+        key: z.string().min(1).optional().describe('the round\'s key, e.g. targets-round; assigned (R1, R2, ...) when omitted'),
+        title: z.string().min(1).describe('one line: what this change was'),
+        detail: z.string().optional().describe('what moved and how it was checked, in full'),
+      },
+    },
+    async ({ key, title, detail }) => text(store.roundRecord(key, title, detail)),
   )
 
   server.registerTool(
@@ -547,6 +644,53 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
         content: [{ type: 'text' as const, text: `Chain file: ${resolved}\n${store.standing()}` }],
       }
     },
+  )
+
+  server.registerTool(
+    'target_new',
+    {
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      title: 'New target — a second pipeline on this chain',
+      description:
+        'Add a sub-target: its own root, standing and frontier beside the main target, for work that consumes the build rather than being part of it (publishing, deploying, a benchmark campaign). The main target is what graph_new created. Named <project>/<id>; selected on creation. A legacy single-target chain is migrated first: a project node is placed above the old root, which stays the main target, and every event replays unchanged. Claims from another target can be linked in as parts but are judged only in their home target.',
+      inputSchema: {
+        id: z.string().min(1).describe('the target id, e.g. publish; with adopt, an existing claim'),
+        content: z.string().optional().describe('the target claim — what done means for this pipeline (not used with adopt: the claim keeps its text)'),
+        verify: z.string().optional().describe('how the target will be judged'),
+        rationale: z.string().optional().describe('why this is a target of its own and not a part of the main target'),
+        adopt: z
+          .boolean()
+          .optional()
+          .describe('make an EXISTING claim a target: it is linked under the project node and released from every whole it was a part of, its subtree and their judgments intact — for a pipeline that was decomposed under the build by mistake'),
+      },
+    },
+    async ({ id, content, verify, rationale, adopt }) => {
+      if (!adopt && (content === undefined || content === '')) return text({ ok: false, text: 'Rejected: a new target needs its claim text (content), or pass adopt to promote an existing claim' })
+      return withCriterionNote(store.targetNew(id, composeClaim(content ?? '', verify), rationale, adopt === true), verify, content ?? '')
+    },
+  )
+
+  server.registerTool(
+    'target_switch',
+    {
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      title: 'Switch target',
+      description:
+        'Select the target this session works on: graph_state, graph_audit, the frontier and the standing line then speak for that target, and judgments are accepted only on claims whose home it is. Session state, not a chain event.',
+      inputSchema: { id: z.string().min(1) },
+    },
+    async ({ id }) => text(store.targetSwitch(id)),
+  )
+
+  server.registerTool(
+    'target_list',
+    {
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      title: 'Targets — every pipeline on this chain with its standing',
+      description: 'The main target and every sub-target, each with solid or broken, the size of its cone, its frontier and its open issues; the current one marked.',
+      inputSchema: {},
+    },
+    async () => ({ content: [{ type: 'text' as const, text: store.targetList() }] }),
   )
 
   server.registerTool(

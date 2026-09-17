@@ -1,5 +1,6 @@
 import { isVersionOp, type EventChain } from './chain'
 import { Graph } from '../kernel/graph'
+import type { NodeId } from '../kernel/types'
 import { issueSummary, readIssues } from './issues'
 
 /**
@@ -19,6 +20,8 @@ export interface Version {
   openIssues: number
   /** events recorded after this mark */
   eventsSince: number
+  /** every target's standing at the mark, on a multi-target chain */
+  targets?: { id: NodeId; solid: boolean }[]
 }
 
 export function readVersions(chain: EventChain): Version[] {
@@ -31,10 +34,11 @@ export function readVersions(chain: EventChain): Version[] {
     const v: Version = {
       name: op.name,
       seq: ev.seq,
-      rootSolid: g.solid(g.root),
+      rootSolid: g.solid(chain.project !== undefined && g.has(chain.project) ? (g.predecessors(chain.project)[0] ?? g.root) : g.root),
       openIssues: issueSummary(readIssues(chain, ev.seq)).open,
       eventsSince: events.length - ev.seq,
     }
+    if (chain.project !== undefined && g.has(chain.project)) v.targets = g.predecessors(chain.project).map((id) => ({ id, solid: g.solid(id) }))
     if (op.commit !== undefined) v.commit = op.commit
     if (op.dirty !== undefined) v.dirty = op.dirty
     if (op.note !== undefined) v.note = op.note
@@ -58,7 +62,7 @@ export function versionsReport(versions: readonly Version[]): string {
   const lines = [`Versions (${versions.length}, newest first):`]
   for (const v of [...versions].reverse()) {
     lines.push(
-      `- ${versionLabel(v)} at event ${v.seq}: root ${v.rootSolid ? 'solid' : 'broken'}, ${v.openIssues} open issue(s), ${v.eventsSince} event(s) since${v.note ? ` — ${v.note}` : ''}${v.dirty ? ' (marked on a dirty tree: the commit alone does not identify the code)' : ''}`,
+      `- ${versionLabel(v)} at event ${v.seq}: root ${v.rootSolid ? 'solid' : 'broken'}${v.targets && v.targets.length > 1 ? ` (targets: ${v.targets.map((t) => `${t.id} ${t.solid ? 'solid' : 'broken'}`).join(', ')})` : ''}, ${v.openIssues} open issue(s), ${v.eventsSince} event(s) since${v.note ? ` — ${v.note}` : ''}${v.dirty ? ' (marked on a dirty tree: the commit alone does not identify the code)' : ''}`,
     )
   }
   return lines.join('\n')

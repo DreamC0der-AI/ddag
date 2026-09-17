@@ -7,6 +7,8 @@ import { Registry } from '../../mcp/registry'
 import { McpStore } from '../../mcp/store'
 import { _resetAuditCache, startDashboard, summarize } from '../server'
 import { collectProvenance } from '../../mcp/provenance'
+import { EventChain } from '../../chain/chain'
+import { PROJECT_ID, migrateToProject } from '../../chain/targets'
 
 const scratch = () => mkdtempSync(join(tmpdir(), 'ddag-dash-'))
 
@@ -121,6 +123,35 @@ describe('dashboard server', () => {
     expect(audit.nodes['p']!.status).toBe('stale')
     expect(store.auditReport()).toContain('- p: STALE? — since')
     expect(store.auditReport()).toContain('a.txt changed')
+  })
+
+  it('/api/projects reads a multi-target chain per target: rootSolid is the main target, targets lists each; a legacy chain has no targets', async () => {
+    const dir = join(scratch(), 'epsilon')
+    mkdirSync(dir)
+    // a project node with two targets: the main one (build) solid, the sub-target (publish) waiting on its part
+    const chain = EventChain.replay(migrateToProject(EventChain.create('build', 'the build works').dump(), 'Project'))
+    chain.dispatch({ type: 'add', id: 'lib', content: 'lib works', successor: 'build' })
+    chain.dispatch({ type: 'verify', id: 'lib', result: 'valid' }, 'reviewed')
+    chain.dispatch({ type: 'verify', id: 'build', result: 'valid' }, 'parts hold')
+    chain.dispatch({ type: 'add', id: 'publish', content: 'the build is published', successor: PROJECT_ID })
+    chain.dispatch({ type: 'add', id: 'npm', content: 'npm serves it', successor: 'publish' })
+    chain.dispatch({ type: 'link', from: 'lib', to: 'publish' }) // used in publish, judged in build
+    writeFileSync(join(dir, 'ddag.json'), JSON.stringify(chain.dump()))
+    registry.register(join(dir, 'ddag.json'))
+
+    const { projects } = (await (await fetch(`${base}/api/projects`)).json()) as { projects: ReturnType<typeof summarize>[] }
+    const byName = Object.fromEntries(projects.map((p) => [p.name, p]))
+    const eps = byName['epsilon']!
+    // the main target's standing, never the project node's (which is never judged) nor the sub-target's
+    expect(eps).toMatchObject({ exists: true, rootId: 'build', rootClaim: 'the build works', rootSolid: true, frontier: 0, events: 6 })
+    expect(eps.targets).toEqual([
+      { id: 'build', solid: true, frontier: 0, nodes: 2 },
+      { id: 'publish', solid: false, frontier: 1, nodes: 3 }, // publish, npm, and lib by link
+    ])
+    expect(eps.targets!.map((t) => t.id)).not.toContain(PROJECT_ID)
+    // a legacy single-target chain carries no targets field at all
+    expect(byName['alpha']).not.toHaveProperty('targets')
+    expect(byName['beta']).not.toHaveProperty('targets')
   })
 
   it('is read-only', async () => {

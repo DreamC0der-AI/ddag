@@ -19,9 +19,17 @@ describe('security: the MCP shell on hostile input', () => {
     writeFileSync(join(root, 'ok.ts'), 'fine')
     const secret = join(scratch(), 'secret.txt')
     writeFileSync(secret, 'TOP SECRET')
+    // explicit artifacts outside the root: refused, with the reason; and since explicit artifacts are
+    // the whole pin set (PIN-2), nothing else is pinned in their place
     const c = collectProvenance(`reviewed ok.ts and ../secret.txt and ${secret}`, ['../secret.txt', secret], root)
-    expect(c.provenance.artifacts.map((a) => a.path)).toEqual(['ok.ts'])
+    expect(c.provenance.artifacts.map((a) => a.path)).toEqual([])
     expect(c.warnings.join(' ')).toContain('not found under the project root')
+    // paths cited in prose outside the root: never pinned; the one inside is
+    const prose = collectProvenance(`reviewed ok.ts and ../secret.txt and ${secret}`, [], root)
+    expect(prose.provenance.artifacts.map((a) => a.path)).toEqual(['ok.ts'])
+    // an explicit inside path beside an outside one: only the inside one
+    const mixed = collectProvenance('x', ['ok.ts', secret], root)
+    expect(mixed.provenance.artifacts.map((a) => a.path)).toEqual(['ok.ts'])
   })
 
   it('sec-containment: a symlink inside the root that points outside is not pinned as the target', () => {
@@ -117,7 +125,7 @@ describe('security: the MCP shell on hostile input', () => {
     const file = join(dir, 'ddag.json')
     writeFileSync(file, '{}')
     const store = new McpStore(file, dir)
-    for (const report of [() => store.stateReport(), () => store.historyReport(20), () => store.auditReport(), () => store.issuesReport(), () => store.versionsReport()]) {
+    for (const report of [() => store.stateReport(), () => store.historyReport({ limit: 20 }), () => store.auditReport(), () => store.issuesReport(), () => store.versionsReport()]) {
       let text = ''
       expect(() => (text = report())).not.toThrow()
       expect(text).toContain('Refused: the chain file')

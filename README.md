@@ -89,7 +89,9 @@ a better wording is restated with `mutate` instead. From then on:
 - It works the **frontier**, the claims whose parts are all solid. Nothing off
   the frontier can be judged; the server refuses it.
 - Every `verify` carries evidence written for a reader who was not there, and
-  is pinned to the git HEAD and the files it cites.
+  is pinned to the git HEAD and the files it was given: the `artifacts` passed
+  with it, or, for a leaf judged without any, the paths its evidence names. A
+  claim with parts rests on its parts and pins no files.
 - Wrong turns are recorded as `verify = invalid`, dead ends as `discard`.
   They are the most useful entries when you read the chain back.
 - When the root turns **solid**, the target is verified. Standing is one line:
@@ -139,6 +141,27 @@ user with only the README can do everything the README says", settled by a
 tester session that has no source access and uses only the real interface.
 Until both are judged, the root says "built", not "done". DOCTRINE.md, "What
 a Shipped Target Rests On".
+
+### Targets
+
+A chain has one main target, the build, and can carry sub-targets for the
+pipelines that consume it: publishing, deploying, a benchmark run. A
+sub-target is never a part of the build, so its wait never reads as the
+build being broken. Each target has its own standing and frontier, and the
+shells show one at a time:
+
+```
+target_new    publish  "0.3.2 is published where a user finds it"   # or adopt: true to promote an existing claim
+target_switch publish                                              # graph_state, graph_audit and the standing line now speak for it
+target_list                                                        # every target with solid / broken
+```
+
+The main target keeps its name; a sub-target is named `<project>/<id>`,
+so the dashboard shows `vault-cli/publish`. A claim from another target can
+be linked in as a part and is judged only in its home target; here it is
+used. The first `target_new` on an existing chain migrates it in place:
+a project node goes above the old root, which stays the main target, and
+every event replays unchanged.
 
 ## The dashboard
 
@@ -213,8 +236,11 @@ source of trust.
 | `restructure` | A topic gets its properties: add the parts it stands for, all or nothing. |
 | `issue_open` / `issue_close` / `issue_list` | Record a finding with its full detail on the claim it concerns; close it with an outcome and what changed; the fixer's worklist. |
 | `version_mark` / `version_list` | Declare a working version after the commit that concluded it; every version with what the chain said of it then. |
-| `graph_state` / `graph_history` / `graph_audit` | The standing and frontier; the chain; which judgments rest on code that changed since, with the hunks (approximate for a judgment pinned on a dirty tree). |
+| `graph_state` / `graph_history` / `graph_audit` | The standing and frontier, one line per node with the frontier nodes in full (`node` for one node in full, `full` for all); the chain, read selectively — one claim's own chain (`node`), the current target's (`cone`), or what happened after a position (`since`; the standing line ends with `at #N`), evidence as its first sentence unless `full`; which judgments rest on code that changed since, with the hunks (approximate for a judgment pinned on a dirty tree). |
+| `why` | Why a claim is in its current state, in a few lines: what it was last judged on, or the event that reopened it and the claim that event was about. |
+| `round_record` | Describe a change once — what moved, how it was checked — and cite it by key (`round`) from each judgment re-anchored after it, whose evidence is then one sentence about its own claim. |
 | `graph_new` / `graph_open` | Start a chain in this folder with the target as its root, replacing any chain already there; open one under it. |
+| `target_new` / `target_switch` / `target_list` | Add a sub-target (or adopt an existing claim as one); choose the target this session works on; every target with its standing. |
 
 ## Storage
 

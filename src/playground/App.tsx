@@ -1,10 +1,11 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { GraphCanvas } from './GraphCanvas'
 import { parseClaim } from '../chain/claim'
 import { opNotation } from '../chain/notation'
 import { groundsLabel } from '../chain/explain'
 import { versionLabel } from '../chain/versions'
-import { OPERATION_KINDS, describeDiff, kindOfEntry, useSim } from './store'
+import { firstSentence } from '../chain/reader'
+import { OPERATION_KINDS, describeDiff, kindOfEntry, useSim, type FeedEntry, type Said, type TimelineRow } from './store'
 
 function OperationsPanel() {
   const sim = useSim()
@@ -46,6 +47,9 @@ function OperationsPanel() {
         <li className="ops-row" title="a working version declared after a commit (version_mark)">
           <span className="ops-kind kind-Version">Version</span>
         </li>
+        <li className="ops-row" title="a change described once — what moved and how it was checked — cited by the judgments re-anchored after it (round_record)">
+          <span className="ops-kind kind-Round">Round</span>
+        </li>
       </ul>
     </section>
   )
@@ -66,10 +70,220 @@ function NodeChips({ ids, empty, onSelect }: { ids: string[]; empty: string; onS
   )
 }
 
-function DetailPanel({ id, onSelect }: { id: string | null; onSelect: (id: string) => void }) {
+type Judged = NonNullable<ReturnType<ReturnType<typeof useSim>['nodeHistory']>['judged']>
+
+/** JUDGED: the verdict and the first sentence of its grounds; the whole text and the cited round open in place. */
+function JudgedLine({ judged, showPin }: { judged: Judged | undefined; showPin: boolean }) {
+  const sim = useSim()
+  const [more, setMore] = useState(false)
+  const [roundOpen, setRoundOpen] = useState(false)
+  if (!judged) {
+    return (
+      <div className="detail-line">
+        <span className="detail-label">judged</span>
+        <span className="detail-none">never</span>
+      </div>
+    )
+  }
+  const whole = (judged.evidence ?? '').trim()
+  const flat = whole.replace(/\s+/g, ' ')
+  const first = flat === '' ? '' : firstSentence(flat)
+  const long = first !== flat
+  const round = judged.round !== undefined ? sim.roundOf(judged.round) : null
+  return (
+    <>
+      <div className="detail-line">
+        <span className="detail-label">judged</span>
+        <span className="detail-text">
+          {/* the whole text scrolls in its own box; the controls stay outside it, in reach */}
+          <span className={more ? 'judged-body judged-full' : 'judged-body'}>
+            <span className={`judged-word judged-${judged.result}`}>{judged.result}</span>
+            {first !== '' && <> — {more ? whole : first}</>}
+          </span>
+          {long && (
+            <button type="button" className="more-btn" aria-expanded={more} onClick={() => setMore((m) => !m)}>
+              {more ? 'less' : 'more'}
+            </button>
+          )}
+          {showPin && judged.pin && <span className="pin-tag">pinned {judged.pin}</span>}
+          {judged.round !== undefined && (
+            <button
+              type="button"
+              className={roundOpen ? 'round-chip round-chip-on' : 'round-chip'}
+              title={round ? `${round.title} — click for the round` : 'round record not found on this chain'}
+              aria-expanded={roundOpen}
+              onClick={() => setRoundOpen((o) => !o)}
+            >
+              round {judged.round}
+            </button>
+          )}
+        </span>
+      </div>
+      {roundOpen && (
+        <div className="round-body">
+          <div className="round-title">
+            <span className="kind-Round">◆ {judged.round}</span> {round ? round.title : 'not recorded on this chain'}
+            {round && <span className="round-seq">event {round.seq}</span>}
+          </div>
+          {round?.detail && <pre className="round-detail">{round.detail}</pre>}
+        </div>
+      )}
+    </>
+  )
+}
+
+const TIMELINE_KEY = 'ddag.timelineOpen'
+
+/** TIMELINE: the claim's own chain, oldest first — re-anchoring runs one row each, causes as chips. */
+function Timeline({ id, goTo, onReveal }: { id: string; goTo: (id: string) => void; onReveal: (seq: number) => void }) {
   const sim = useSim()
   const g = sim.graph
-  if (id === null || !g.has(id)) {
+  const project = sim.projectNode()
+  const rows = sim.timelineOf(id)
+  const [open, setOpen] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(TIMELINE_KEY) !== '0'
+    } catch {
+      return true
+    }
+  })
+  const [runsOpen, setRunsOpen] = useState<ReadonlySet<number>>(new Set())
+  const toggle = () => {
+    setOpen((o) => {
+      try {
+        localStorage.setItem(TIMELINE_KEY, o ? '0' : '1')
+      } catch {
+        // per-browser convenience only
+      }
+      return !o
+    })
+  }
+  const toggleRun = (first: number) =>
+    setRunsOpen((s) => {
+      const next = new Set(s)
+      if (!next.delete(first)) next.add(first)
+      return next
+    })
+  const seqBtn = (seq: number, label = `#${seq}`, inline = false) => (
+    <button type="button" className={inline ? 'tl-seq tl-seq-inline' : 'tl-seq'} title={`show event ${seq} in the Actions log`} onClick={() => onReveal(seq)}>
+      {label}
+    </button>
+  )
+  const chip = (node: string) => {
+    if (node === project) return <span className="tl-plain">the project</span>
+    if (!g.has(node)) return <span className="tl-plain" title="no longer in the graph">{node}</span>
+    const inCone = sim.cone().has(node)
+    return (
+      <button
+        type="button"
+        className={inCone ? 'node-chip tl-chip' : 'node-chip tl-chip tl-chip-away'}
+        title={inCone ? 'select this claim' : `in target ${sim.targetLabel(sim.homeOf(node))} — click to view it there`}
+        onClick={() => goTo(node)}
+      >
+        <span className={`dot dot-${g.verdict(node)}`} />
+        {node}
+      </button>
+    )
+  }
+  const grounds = (s: Said | null) =>
+    s && (
+      <>
+        {s.grounds !== null && (
+          <span className="tl-grounds" title={s.full ?? undefined}>
+            — {s.grounds}
+          </span>
+        )}
+        {s.round !== null && (
+          <span className="round-chip round-chip-static" title={sim.roundOf(s.round)?.title}>
+            round {s.round}
+          </span>
+        )}
+      </>
+    )
+  const render = (r: TimelineRow) => {
+    if (r.type === 'noise') {
+      return (
+        <li key="noise" className="tl-row tl-noise">
+          <span className="tl-seq tl-seq-none" />
+          <span className="tl-what">
+            reopened and restored {r.count} time{r.count === 1 ? '' : 's'} by re-anchorings beneath it, last at {seqBtn(r.last, `#${r.last}`, true)} — no
+            judgment of its own moved
+          </span>
+        </li>
+      )
+    }
+    if (r.type === 'run') {
+      if (r.count === 1) {
+        return (
+          <li key={r.first} className="tl-row">
+            {seqBtn(r.last)}
+            <span className="tl-what">
+              <span className="tl-verb">re-anchored</span> {grounds(r.items[0]!)}
+            </span>
+          </li>
+        )
+      }
+      const isOpen = runsOpen.has(r.first)
+      return (
+        <li key={r.first} className="tl-row tl-run">
+          {seqBtn(r.last, `#${r.first}–#${r.last}`)}
+          <span className="tl-what">
+            <button type="button" className="tl-run-btn" aria-expanded={isOpen} onClick={() => toggleRun(r.first)}>
+              <span className="tl-caret">{isOpen ? '▾' : '▸'}</span> re-anchored {r.count} times
+            </button>{' '}
+            {!isOpen && <span className="tl-last">the last</span>} {!isOpen && grounds(r.items[r.items.length - 1]!)}
+            {isOpen && (
+              <ol className="tl-sub">
+                {r.items.map((s) => (
+                  <li key={s.seq} className="tl-row">
+                    {seqBtn(s.seq)}
+                    <span className="tl-what">
+                      <span className="tl-verb">re-anchored</span> {grounds(s)}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </span>
+        </li>
+      )
+    }
+    return (
+      <li key={`${r.seq}:${r.what}`} className={r.direct ? 'tl-row' : 'tl-row tl-indirect'}>
+        {seqBtn(r.seq)}
+        <span className="tl-what">
+          <span className="tl-verb">{r.what}</span> {r.node !== null && chip(r.node)}
+          {r.via !== null && (
+            <span className="tl-via" title={r.direct ? 'the operation this event was part of' : 'the operation the cause was part of'}>
+              {r.via}
+            </span>
+          )}
+          {r.tail !== null && <span className="tl-tail"> — {r.tail}</span>} {grounds(r.said)}
+        </span>
+      </li>
+    )
+  }
+  return (
+    <div className="timeline">
+      <button type="button" className="tl-toggle" aria-expanded={open} onClick={toggle} title={open ? 'hide the timeline' : 'show the timeline'}>
+        <span className="tl-caret">{open ? '▾' : '▸'}</span>
+        <span className="detail-label">timeline</span>
+        <span className="tl-count">
+          {rows.length} row{rows.length === 1 ? '' : 's'}
+        </span>
+      </button>
+      {open && (rows.length === 0 ? <span className="detail-none">present at genesis — no events of its own</span> : <ol className="tl-list">{rows.map(render)}</ol>)}
+    </div>
+  )
+}
+
+function DetailPanel({ id, onSelect, onReveal }: { id: string | null; onSelect: (id: string) => void; onReveal: (seq: number) => void }) {
+  const sim = useSim()
+  const g = sim.graph
+  const project = sim.projectNode()
+  // the project node is a reading device, never a claim: it is absent from every list
+  const shown = (ids: string[]) => ids.filter((x) => x !== project)
+  if (id === null || !g.has(id) || id === project) {
     return (
       <footer className="detail detail-empty">
         Click a node to inspect it. Drag to arrange — a dragged node stays where you put it;
@@ -80,6 +294,13 @@ function DetailPanel({ id, onSelect }: { id: string | null; onSelect: (id: strin
   const n = g.node(id)
   const solid = g.solid(id)
   const onFrontier = sim.onFrontier().has(id)
+  const target = sim.currentTarget()
+  const home = sim.homeOf(id)
+  // a claim outside the viewed target's cone is reached the way the HOME chip reaches it: through its own target
+  const goTo = (nid: string) => {
+    if (!sim.cone().has(nid)) sim.selectTarget(sim.homeOf(nid))
+    onSelect(nid)
+  }
   const fpText =
     n.fingerprint === null
       ? 'no fingerprint — never verified valid, or judgment withdrawn (Doubt)'
@@ -95,7 +316,17 @@ function DetailPanel({ id, onSelect }: { id: string | null; onSelect: (id: strin
           {solid ? 'solid' : 'broken'}
         </span>
         {onFrontier && <span className="frontier-chip">verifiable now</span>}
-        {id === g.root && <span className="root-chip">root</span>}
+        {id === target && <span className="root-chip">root</span>}
+        {home !== target && (
+          <button
+            type="button"
+            className="home-chip home-chip-detail"
+            title={`judged in target ${sim.targetLabel(home)} — click to view that target`}
+            onClick={() => sim.selectTarget(home)}
+          >
+            home: {sim.targetLabel(home)}
+          </button>
+        )}
         <span className="detail-version">v{n.version}</span>
       </div>
       {(() => {
@@ -114,12 +345,17 @@ function DetailPanel({ id, onSelect }: { id: string | null; onSelect: (id: strin
                 <span className="detail-text">{h.because}</span>
               </div>
             )}
-            <div className="detail-line">
-              <span className="detail-label">judged</span>
-              <span className={h.judged ? 'detail-text' : 'detail-none'}>
-                {h.judged ? `${h.judged.result}${h.judged.evidence ? ` — ${h.judged.evidence}` : ''}` : 'never'}
-              </span>
-            </div>
+            {/* the pin is said once: by AUDIT when it reports one, else here */}
+            <JudgedLine key={`${id}:${h.judged?.seq ?? 0}`} judged={h.judged} showPin={sim.auditOf(id)?.pin === undefined} />
+            <Timeline key={id} id={id} goTo={goTo} onReveal={onReveal} />
+            {home !== target && (
+              <div className="detail-line">
+                <span className="detail-label">home</span>
+                <span className="detail-text">
+                  {sim.targetLabel(home)} — {sim.cone().has(id) ? 'used here, judged there' : 'judged there; not part of this target'}
+                </span>
+              </div>
+            )}
             {(() => {
               const a = sim.auditOf(id)
               if (!a) return null
@@ -162,11 +398,11 @@ function DetailPanel({ id, onSelect }: { id: string | null; onSelect: (id: strin
         )}
         <div className="detail-row">
           <span className="detail-label">parts</span>
-          <NodeChips ids={g.predecessors(id)} empty="none — leaf" onSelect={onSelect} />
+          <NodeChips ids={shown(g.predecessors(id))} empty="none — leaf" onSelect={onSelect} />
         </div>
         <div className="detail-row">
           <span className="detail-label">composes into</span>
-          <NodeChips ids={g.successors(id)} empty="none — this is the root" onSelect={onSelect} />
+          <NodeChips ids={shown(g.successors(id))} empty={project === null ? 'none — this is the root' : 'none — this is a target'} onSelect={onSelect} />
         </div>
         <div className="detail-row">
           <span className="detail-label">memory</span>
@@ -221,6 +457,9 @@ function LegendTip() {
         </li>
         <li>
           <span className="swatch sw-issue">!</span> issues — red: open issues recorded on this claim; grey: all closed
+        </li>
+        <li>
+          <span className="legend-chip home-chip">home</span> home chip — judged in another target, only used in this one
         </li>
       </ul>
         </div>
@@ -341,10 +580,53 @@ function IssuePane({ selected, onSelect }: { selected: string | null; onSelect: 
   )
 }
 
-function ActionLog() {
+interface LogRow {
+  entry: FeedEntry
+  /** the Doubt of a Reverify/Refute pair, folded into its Verify's row */
+  doubt?: FeedEntry
+}
+
+/** Compact rows: a Doubt+Verify pair under one Reverify(x)/Refute(x) label is one act, so one row. */
+function compactRows(feed: readonly FeedEntry[]): LogRow[] {
+  const rows: LogRow[] = []
+  for (let i = 0; i < feed.length; i++) {
+    const e = feed[i]!
+    const next = feed[i + 1]
+    const paired =
+      e.op.type === 'doubt' &&
+      e.via !== undefined &&
+      (e.via.startsWith('Reverify(') || e.via.startsWith('Refute(')) &&
+      next !== undefined &&
+      next.via === e.via &&
+      next.op.type === 'verify' &&
+      next.op.id === e.op.id
+    if (paired) {
+      rows.push({ entry: next!, doubt: e })
+      i++
+    } else rows.push({ entry: e })
+  }
+  return rows
+}
+
+function ActionLog({ reveal }: { reveal: { seq: number; n: number } | null }) {
   const sim = useSim()
   const feed = sim.getFeed()
   const [verbose, setVerbose] = useState(false)
+  const listRef = useRef<HTMLOListElement | null>(null)
+  const [flash, setFlash] = useState<number | null>(null)
+  // a #seq clicked in the timeline: bring that event's row into view and mark it for a moment
+  useEffect(() => {
+    if (reveal === null) return
+    const list = listRef.current
+    const el = list?.querySelector<HTMLElement>(`[data-seqs~="${reveal.seq}"]`)
+    if (!list || !el) return
+    const lr = list.getBoundingClientRect()
+    const er = el.getBoundingClientRect()
+    list.scrollTop += er.top - lr.top - (list.clientHeight - er.height) / 2
+    setFlash(reveal.seq)
+    const t = setTimeout(() => setFlash(null), 1800)
+    return () => clearTimeout(t)
+  }, [reveal])
   return (
     <section className="panel log-panel">
       <h2 className="panel-title">
@@ -379,9 +661,9 @@ function ActionLog() {
           )}
         </p>
       ) : verbose ? (
-        <ol className="log-list">
+        <ol className="log-list" ref={listRef}>
           {[...feed].reverse().map((e) => (
-            <li key={e.key} className="vlog-entry">
+            <li key={e.key} data-seqs={e.seq} className={`vlog-entry${e.op.type === 'round' ? ' log-round' : ''}${flash === e.seq ? ' log-flash' : ''}`}>
               <div className="vlog-head">
                 <span className="log-seq">{e.seq}</span>
                 <span className={`log-short kind-${kindOfEntry(e)}`}>{e.short}</span>
@@ -399,6 +681,7 @@ function ActionLog() {
                   {groundsLabel(e.op)}: {e.evidence}
                 </div>
               )}
+              {e.op.type === 'round' && e.op.detail && <div className="vlog-line vlog-round-detail">{e.op.detail}</div>}
               {e.explain.map((line, i) => {
                 const m = /^(.*?)\s*\[([^\]]+)\]$/.exec(line)
                 return (
@@ -412,16 +695,29 @@ function ActionLog() {
           ))}
         </ol>
       ) : (
-        <ol className="log-list">
-          {[...feed].reverse().map((e) => (
-            <li key={e.key} className={e.op.type === 'version' ? 'log-entry log-version' : 'log-entry'} title={e.evidence}>
-              <span className="log-seq">{e.seq}</span>
-              <span className={`log-short kind-${kindOfEntry(e)}`}>{e.short}</span>
-              <span className={e.via ? 'log-full log-via' : 'log-full'}>
-                {e.via ?? opNotation(e.op)}
-              </span>
-            </li>
-          ))}
+        <ol className="log-list" ref={listRef}>
+          {compactRows(feed)
+            .reverse()
+            .map(({ entry: e, doubt }) => {
+              const band = e.op.type === 'version' ? ' log-version' : e.op.type === 'round' ? ' log-round' : ''
+              const lit = flash !== null && (flash === e.seq || flash === doubt?.seq)
+              return (
+                <li
+                  key={e.key}
+                  data-seqs={doubt ? `${doubt.seq} ${e.seq}` : e.seq}
+                  className={`log-entry${band}${lit ? ' log-flash' : ''}`}
+                  title={e.evidence}
+                >
+                  <span className="log-seq" title={doubt ? `events ${doubt.seq}–${e.seq}: Doubt then Verify, one act` : undefined}>
+                    {e.seq}
+                  </span>
+                  <span className={`log-short kind-${kindOfEntry(e)}`}>{e.short}</span>
+                  <span className={e.via ? 'log-full log-via' : 'log-full'}>
+                    {doubt && e.op.type === 'verify' ? `${e.via} ${e.op.result === 'valid' ? '✓' : '✗'}` : (e.via ?? opNotation(e.op))}
+                  </span>
+                </li>
+              )
+            })}
         </ol>
       )}
     </section>
@@ -445,6 +741,8 @@ interface ProjectSummary {
   rootId?: string
   rootClaim?: string
   rootSolid?: boolean
+  /** every target on a multi-target chain, the main one first; absent on a legacy chain */
+  targets?: { id: string; solid: boolean; frontier: number; nodes: number }[]
   frontier?: number
   events?: number
   lastEvent?: string
@@ -524,10 +822,26 @@ function Home() {
                   <div className="home-head">
                     <span className="home-name">{p.name}</span>
                     {p.exists && !p.error && (
-                      <span className={`state-lamp ${p.rootSolid ? 'lamp-solid' : 'lamp-broken'}`}>
+                      <span className={`state-lamp ${p.rootSolid ? 'lamp-solid' : 'lamp-broken'}`} title={p.targets ? `main target ${p.rootId}` : undefined}>
                         {p.rootSolid ? 'solid' : 'broken'}
                       </span>
                     )}
+                    {/* sub-targets stand on their own: a pipeline's wait must not read as the build being broken */}
+                    {p.targets?.slice(1).map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        className={`target-chip ${t.solid ? 'target-solid' : 'target-broken'}`}
+                        title={`target ${t.id}: ${t.nodes} node(s), ${t.frontier} on the frontier — open it`}
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          window.location.assign(`/p/${encodeURIComponent(p.name)}?target=${encodeURIComponent(t.id)}`)
+                        }}
+                      >
+                        {t.id}: {t.solid ? 'solid' : 'broken'}
+                      </button>
+                    ))}
                     {p.version && (
                       <span className="version-chip" title={`latest version mark; root was ${p.version.rootSolid ? 'solid' : 'broken'} then; ${p.version.eventsSince} event(s) since`}>
                         {p.version.label}
@@ -591,6 +905,29 @@ function ProjectSwitcher({ current }: { current: string | undefined }) {
         <option key={p.chain} value={p.name}>
           {p.name}
           {p.exists && !p.error ? (p.rootSolid ? ' ✓' : '') : ' (missing)'}
+        </option>
+      ))}
+    </select>
+  )
+}
+
+/** Toolbar jump between the chain's targets; absent on a legacy single-target chain. */
+function TargetSwitcher() {
+  const sim = useSim()
+  const targets = sim.targets()
+  if (targets.length < 2) return null
+  const current = sim.currentTarget()
+  return (
+    <select
+      className="btn target-switch"
+      value={current}
+      onChange={(e) => sim.selectTarget(e.target.value === targets[0] ? null : e.target.value)}
+      title="switch target — the view shows one target's cone at a time"
+    >
+      {targets.map((t) => (
+        <option key={t} value={t}>
+          {sim.targetLabel(t)}
+          {sim.graph.solid(t) ? ' ✓' : ''}
         </option>
       ))}
     </select>
@@ -664,14 +1001,23 @@ function Workbench() {
       // per-browser convenience only
     }
   }
-  const rootSolid = sim.graph.solid(sim.graph.root)
+  // the standing shown is the viewed target's: on a multi-target chain the kernel root is the project node, never judged
+  const multi = sim.targets().length > 1
+  const rootSolid = sim.graph.solid(sim.currentTarget())
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [reveal, setReveal] = useState<{ seq: number; n: number } | null>(null)
   const selected = selectedId !== null && sim.graph.has(selectedId) ? selectedId : null
   // a project or chain URL is a dashboard link — open it live, no click needed
   useEffect(() => {
     if (sim.liveSource() && !sim.isLive()) sim.toggleLive()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  // switching target drops a selection the new cone does not show (a chip can still reach one)
+  const target = sim.currentTarget()
+  useEffect(() => {
+    setSelectedId((id) => (id !== null && !sim.cone().has(id) ? null : id))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target])
   return (
     <div className="app" style={{ '--sidebar-w': `${sidebarW}px` } as CSSProperties}>
       <header className="toolbar">
@@ -679,8 +1025,8 @@ function Workbench() {
           <span className="brand-mark">◉</span> Decompose DAG{' '}
           <span className="brand-sub">{sim.liveSource() ? sim.liveChainPath() : 'sandbox'}</span>
         </div>
-        <div className="toolbar-state">
-          root:{' '}
+        <div className="toolbar-state" title={multi ? `target ${sim.currentTarget()}` : undefined}>
+          {multi ? 'target' : 'root'}:{' '}
           <span className={`state-lamp ${rootSolid ? 'lamp-solid' : 'lamp-broken'}`}>
             {rootSolid ? 'solid' : 'broken'}
           </span>
@@ -704,6 +1050,7 @@ function Workbench() {
             ⌂
           </a>
           <ProjectSwitcher current={sim.liveSource()?.project} />
+          <TargetSwitcher />
 
           {/* the random stepper belongs to the sandbox; a project view is a dashboard, not a playground */}
           {!sim.liveSource() && (
@@ -731,12 +1078,12 @@ function Workbench() {
             <GraphCanvas selected={selected} onSelect={setSelectedId} />
             <LegendTip />
           </div>
-          <DetailPanel id={selected} onSelect={setSelectedId} />
+          <DetailPanel id={selected} onSelect={setSelectedId} onReveal={(seq) => setReveal((r) => ({ seq, n: (r?.n ?? 0) + 1 }))} />
         </div>
         <SidebarResizer onResize={resize} />
         <aside className="sidebar">
           <OperationsPanel />
-          <ActionLog />
+          <ActionLog reveal={reveal} />
         </aside>
       </main>
     </div>
