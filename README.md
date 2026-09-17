@@ -57,7 +57,7 @@ published version through its public interface only, same cases for all:
 | `graph_state` at 200 claims | 72.4 KB | 9.1 KB |
 | Files pinned per judgment | 4 | 1.1 |
 | Judgments staled by editing one file (right answer: 1) | 9 | 1 |
-| Latency of a judgment | 21.6 ms | 18.3 ms |
+| Latency of a judgment | 21.6 ms | 20.7 ms, unchanged within noise |
 
 These numbers show mechanisms working and guard against regressions. Whether
 agents build better software with DDAG is a separate, outcome benchmark that is
