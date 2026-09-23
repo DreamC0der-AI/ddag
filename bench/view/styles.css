@@ -59,3 +59,21 @@ svg.spark { display: block; overflow: visible; }
 .tip { position: fixed; pointer-events: none; z-index: 5; background: var(--ink); color: var(--page); padding: 5px 8px; border-radius: 6px; font-size: 12.5px; white-space: nowrap; transform: translate(-50%, calc(-100% - 10px)); }
 .tip b { font-weight: 650; margin-right: 6px; }
 @media (max-width: 560px) { .tile .value { font-size: 26px; } th, td { padding: 8px 9px; } }
+
+/* outcome section */
+#outcome { margin-top: 48px; border-top: 1px solid var(--grid); padding-top: 8px; }
+.outcome-note { color: var(--ink-2); font-size: 13px; line-height: 1.5; max-width: 86ch; margin: 6px 0 14px; }
+.outcome-note strong { color: var(--ink); font-weight: 600; }
+.outcome-task td.bad { color: var(--bad); font-weight: 600; }
+.outcome-task h3 { margin: 22px 0 8px; font-size: 13px; color: var(--ink-2); font-weight: 600; }
+.runs { display: grid; gap: 6px; }
+.run { background: var(--surface); border: 1px solid var(--grid); border-radius: 8px; padding: 8px 12px; font-size: 13px; }
+.run summary { cursor: pointer; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; }
+.run-name { font-weight: 600; min-width: 190px; }
+.run-score { font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 600; }
+.run-meta { color: var(--ink-2); }
+.run dl { display: grid; grid-template-columns: 150px 1fr; gap: 6px 14px; margin: 10px 0 4px; }
+.run dt { color: var(--muted); }
+.run dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 640px) { .run dl { grid-template-columns: 1fr; } }
+.run .warn { color: var(--warn-ink); background: var(--warn-bg); border-radius: 4px; padding: 0 5px; font-weight: 600; }

@@ -22,8 +22,13 @@
       <section id="tables"></section>
       <section class="detail" id="detail" hidden aria-live="polite"></section>
       <p class="foot" id="foot"></p>
+      <section id="outcome" aria-label="Outcome runs"></section>
     </main>
     <div class="tip" id="tip" role="status" hidden></div>
     <script type="module" src="/view/view.js"></script>
+    <script type="module">
+      import { loadOutcome } from '/view/outcome.js'
+      loadOutcome().catch((e) => console.warn('outcome section:', e))
+    </script>
   </body>
 </html>
