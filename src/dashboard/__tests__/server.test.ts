@@ -50,6 +50,32 @@ describe('dashboard server', () => {
   })
   afterAll(() => server.close())
 
+  it('a folder chain (.ddag/chain.json) is listed under its project name, served, audited and counted by its position across segments', async () => {
+    const dirZ = join(scratch(), 'zeta')
+    mkdirSync(join(dirZ, '.ddag'), { recursive: true })
+    writeFileSync(join(dirZ, 'lib.ts'), 'v1\n')
+    const chainZ = join(dirZ, '.ddag', 'chain.json')
+    const g = new McpStore(chainZ, dirZ, (f) => registry.register(f))
+    g.dispatch({ type: 'add', id: 'z', content: 'part z', successor: 'target' })
+    g.dispatch({ type: 'verify', id: 'z', result: 'valid' }, 'lib.ts read', collectProvenance('lib.ts read', ['lib.ts'], dirZ, chainZ).provenance)
+    g.dispatch({ type: 'verify', id: 'target', result: 'valid' }, 'its part holds')
+    expect(g.markVersion({ type: 'version', name: 'v1' }).text).toContain('Rolled: 4 event(s) up to #4')
+    g.dispatch({ type: 'add', id: 'q', content: 'part q', successor: 'target' })
+    _resetAuditCache()
+    const { projects } = (await (await fetch(`${base}/api/projects`)).json()) as { projects: ReturnType<typeof summarize>[] }
+    const gamma = projects.find((p) => p.name === 'zeta')!
+    expect(gamma).toMatchObject({ exists: true, dir: dirZ, chain: chainZ, events: 5, lastEvent: 'Add(q)', stale: 0, version: { label: 'v1', eventsSince: 1 } })
+    const served = (await (await fetch(`${base}/api/chain/zeta`)).json()) as { checkpoint?: { seq: number }; events: unknown[] }
+    expect(served.checkpoint?.seq).toBe(4)
+    expect(served.events).toHaveLength(1)
+    const audit = (await (await fetch(`${base}/api/audit/zeta`)).json()) as { nodes: Record<string, { status: string }> }
+    expect(audit.nodes['z']).toMatchObject({ status: 'intact' }) // the pin came through the checkpoint
+    // the folder itself is never part of a directory hash, so the chain's own writes never stale a pin on the tree
+    const treeBefore = collectProvenance('the tree', ['.'], dirZ, chainZ).provenance.artifacts[0]!.hash
+    g.dispatch({ type: 'add', id: 'r', content: 'part r', successor: 'target' })
+    expect(collectProvenance('the tree', ['.'], dirZ, chainZ).provenance.artifacts[0]!.hash).toBe(treeBefore)
+  })
+
   it('/api/projects lists every registered project with a live summary', async () => {
     const { projects } = (await (await fetch(`${base}/api/projects`)).json()) as { projects: ReturnType<typeof summarize>[] }
     const byName = Object.fromEntries(projects.map((p) => [p.name, p]))
@@ -156,6 +182,25 @@ describe('dashboard server', () => {
 
   it('is read-only', async () => {
     expect((await fetch(`${base}/api/projects`, { method: 'POST' })).status).toBe(405)
+  })
+
+  it('DELETE /api/projects/<name> forgets a missing project and nothing else', async () => {
+    const names = async () => ((await (await fetch(`${base}/api/projects`)).json()) as { projects: { name: string }[] }).projects.map((p) => p.name)
+    // a project whose chain file exists is kept, and its file is untouched
+    const before = readFileSync(chainA, 'utf8')
+    expect((await fetch(`${base}/api/projects/alpha`, { method: 'DELETE' })).status).toBe(409)
+    expect(readFileSync(chainA, 'utf8')).toBe(before)
+    expect((await fetch(`${base}/api/projects/nobody`, { method: 'DELETE' })).status).toBe(404)
+    expect((await fetch(`${base}/api/projects/a%2Fb`, { method: 'DELETE' })).status).toBe(404)
+    // the other write methods stay refused on the same route
+    expect((await fetch(`${base}/api/projects/ghost`, { method: 'POST' })).status).toBe(405)
+    expect(await names()).toContain('ghost')
+    const gone = await fetch(`${base}/api/projects/ghost`, { method: 'DELETE' })
+    expect(gone.status).toBe(200)
+    expect(await gone.json()).toEqual({ removed: 'ghost' })
+    expect(await names()).not.toContain('ghost')
+    expect(await names()).toContain('alpha')
+    expect((await fetch(`${base}/api/projects/ghost`, { method: 'DELETE' })).status).toBe(404)
   })
 
   it('serves assets under the build dir and the app shell for every route', async () => {

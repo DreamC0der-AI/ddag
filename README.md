@@ -72,7 +72,8 @@ claude mcp add --scope user ddag -- npx -y @dreamc0der/ddag
 ```
 
 That is the whole setup. The server runs from the folder Claude Code is
-opened in and uses `./ddag.json` there. The first time it runs it also starts
+opened in and keeps the chain in `./.ddag/` there (a `./ddag.json` from an
+earlier version is migrated into it on first open). The first time it runs it also starts
 the dashboard at http://localhost:5199/ as a detached local process, which
 keeps running while sessions come and go. To start or restart it by hand:
 
@@ -101,8 +102,8 @@ npm run dashboard
 Everything stays on your machine. The server reads and writes the project
 folder it runs in (the chain file, git metadata and hashes of the files a
 judgment cites) and a registry of project paths under `~/.ddag/`. The
-dashboard binds to localhost, is read-only, and serves only registered chain
-paths. Nothing is sent anywhere; there is no telemetry and no network access
+dashboard binds to localhost, never writes to a project, and serves only
+registered chain paths. Nothing is sent anywhere; there is no telemetry and no network access
 beyond the loopback interface.
 
 ## Use
@@ -112,7 +113,7 @@ Open any project folder in Claude Code and ask it to build with DDAG:
 > Build a CLI that ... Use ddag: decompose the target first, verify bottom-up,
 > record what you find.
 
-The first operation creates `<folder>/ddag.json` and registers the project in
+The first operation creates `<folder>/.ddag/chain.json` and registers the project in
 `~/.ddag/projects.json` (set `DDAG_HOME` to move the registry). The agent
 starts with `graph_new`, which names the build target as the root claim; on a
 folder that already has a chain, `graph_new` replaces it, so a root that needs
@@ -125,7 +126,11 @@ a better wording is restated with `mutate` instead. From then on:
 - Every `verify` carries evidence written for a reader who was not there, and
   is pinned to the git HEAD and the files it was given: the `artifacts` passed
   with it, or, for a leaf judged without any, the paths its evidence names. A
-  claim with parts rests on its parts and pins no files.
+  claim with parts rests on its parts and pins no files; a folder passed on
+  such a claim is refused, because it would go stale on every change under it
+  while its parts already watch their own files. `graph_audit` also lists the
+  files three or more claims pin, where one change fans out into many
+  re-verifications.
 - Wrong turns are recorded as `verify = invalid`, dead ends as `discard`.
   They are the most useful entries when you read the chain back.
 - When the root turns **solid**, the target is verified. Standing is one line:
@@ -135,7 +140,7 @@ Root vault-cli: SOLID — the target is verified. Frontier: (empty)
 ```
 
 **One project, one chain.** The build, its audits, its fixes and its versions
-all go on the folder's `ddag.json`. Several Claude Code sessions may work the
+all go on the folder's `.ddag/chain.json`. Several Claude Code sessions may work the
 same folder at once: each operation locks the file, catches up on what the
 other session wrote, applies against the current state, and writes
 atomically. An operation the other session made illegal is refused with the
@@ -245,8 +250,10 @@ file; nothing needs a refresh. Its sections, from the first screenshot:
   event with its evidence on hover; verbose explains each event: what was
   done, its grounds, and what it changed. Versions show as bands.
 
-The dashboard is read-only, serves only registered chain paths, and binds to
-localhost.
+The dashboard never writes to a project, serves only registered chain paths,
+and binds to localhost. Its one write is to its own list: a project whose chain
+file is gone shows a **remove** button, which drops that line from
+`~/.ddag/projects.json` and touches nothing else.
 
 ## The operations
 
@@ -272,16 +279,23 @@ source of trust.
 | `version_mark` / `version_list` | Declare a working version after the commit that concluded it; every version with what the chain said of it then. |
 | `graph_state` / `graph_history` / `graph_audit` | The standing and frontier, one line per node with the frontier nodes in full (`node` for one node in full, `full` for all); the chain, read selectively — one claim's own chain (`node`), the current target's (`cone`), or what happened after a position (`since`; the standing line ends with `at #N`), evidence as its first sentence unless `full`; which judgments rest on code that changed since, with the hunks (approximate for a judgment pinned on a dirty tree). |
 | `why` | Why a claim is in its current state, in a few lines: what it was last judged on, or the event that reopened it and the claim that event was about. |
-| `round_record` | Describe a change once — what moved, how it was checked — and cite it by key (`round`) from each judgment re-anchored after it, whose evidence is then one sentence about its own claim. |
+| `round_record` | Describe a change once — what moved, how it was checked — and cite it by key (`round`) from each judgment re-anchored after it, whose evidence is then one sentence about its own claim. With `files` and `claims`, the judgments the change does not concern are carried: their pins move to the new hashes in one event, marked as carried on the agent's word, and only the named claims go stale. |
 | `graph_new` / `graph_open` | Start a chain in this folder with the target as its root, replacing any chain already there; open one under it. |
 | `target_new` / `target_switch` / `target_list` | Add a sub-target (or adopt an existing claim as one); choose the target this session works on; every target with its standing. |
 
 ## Storage
 
-- `<project>/ddag.json` is the chain: an ordered list of events, each with its
-  operation, rationale or evidence, provenance (commit, dirty flag, artifact
-  hashes) and a snapshot. It belongs in the repository; it is the project's
-  decision log.
+- `<project>/.ddag/chain.json` is the live chain: an ordered list of events,
+  each with its operation, rationale or evidence and provenance (commit, dirty
+  flag, artifact hashes), starting from a checkpoint. `version_mark` rolls it:
+  the segment is sealed into `.ddag/archive/NNN-<version>.json`, a complete
+  chain of its own that is never written again, and the live chain starts
+  from a checkpoint holding the graph, what each claim was last judged on,
+  every issue, version and round, and each claim's home target. Event numbers
+  continue across segments. A `ddag.json` from before 0.5 is migrated into
+  the folder on first open, split at its version marks, with the original
+  kept beside them as `migrated-ddag.json`. The folder belongs in the
+  repository; it is the project's decision log.
 - `~/.ddag/projects.json` is the registry of folders that have a chain, which
   the dashboard reads. A project's name is its folder's basename.
 
@@ -301,7 +315,7 @@ npm run dev               # the web app with HMR on :5299 (/api proxied to :5199
   release goes out.
 - DDAG is built through DDAG: the repository's own chain and the projects
   used to exercise it are the author's working record and are not published.
-  `ddag.json`, `testcases/` and `testbed/` are ignored, so a chain you start
+  `.ddag/`, `ddag.json`, `testcases/` and `testbed/` are ignored, so a chain you start
   in this folder stays yours.
 
 ## License

@@ -36,6 +36,23 @@ describe('project registry', () => {
     expect(reg.find('nope')).toBeUndefined()
   })
 
+  it('forget drops a missing project only, and a returning chain registers again', () => {
+    const reg = new Registry(join(scratch(), 'projects.json'))
+    expect(reg.forget('nobody')).toBe('unknown') // no registry file yet
+    const live = join(scratch(), 'live')
+    mkdirSync(live)
+    writeFileSync(join(live, 'ddag.json'), '{}')
+    reg.register(join(live, 'ddag.json'))
+    const lost = join(scratch(), 'lost', 'ddag.json')
+    reg.register(lost)
+    expect(reg.forget('live')).toBe('present')
+    expect(reg.forget('nobody')).toBe('unknown')
+    expect(reg.forget('lost')).toBe('forgotten')
+    expect(reg.read().map((p) => p.name)).toEqual(['live'])
+    expect(readFileSync(join(live, 'ddag.json'), 'utf8')).toBe('{}')
+    expect(reg.register(lost).name).toBe('lost')
+  })
+
   it('a corrupt registry file reads as empty and is overwritten on the next register', () => {
     const file = join(scratch(), 'projects.json')
     writeFileSync(file, '{ not json')

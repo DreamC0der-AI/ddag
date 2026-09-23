@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -80,6 +80,68 @@ describe('reading the chain selectively, rounds, and the pin rule', () => {
     expect(await call(client, 'why', { id: 'lib' })).toContain('[round fmt-round: formatter pass over lib.ts]')
     // a record: the graph never moved, and it replays
     expect(await call(client, 'graph_history', { limit: 5 })).toContain('Round(fmt-round) — round: formatter pass over lib.ts')
+  })
+
+  it('a round with files and claims carries the other judgments on those files, leaves the named ones stale, and every view says carried; without a round nothing changes', async () => {
+    const { dir, client } = await project()
+    await call(client, 'verify', { id: 'lib', result: 'valid', evidence: 'lib.ts reviewed', artifacts: ['lib.ts'] })
+    await call(client, 'verify', { id: 'docs', result: 'valid', evidence: 'docs.md against lib.ts', artifacts: ['lib.ts', 'docs.md'] })
+    await call(client, 'verify', { id: 'group', result: 'valid', evidence: 'its part holds, and lib.ts read', artifacts: ['lib.ts'] })
+    writeFileSync(join(dir, 'lib.ts'), 'v2\n')
+    expect(await call(client, 'graph_audit')).toContain('Evidence audit (3 judgment(s) resting on changed artifacts')
+    // refusals write nothing
+    const before = await call(client, 'graph_history', { limit: 1 })
+    expect(await call(client, 'round_record', { title: 'x', files: ['nope.ts'], claims: ['lib'] })).toContain("Rejected: 'nope.ts' does not exist under the project root")
+    expect(await call(client, 'round_record', { title: 'x', files: ['lib.ts'], claims: ['ghost'] })).toContain('Rejected: claim "ghost" does not exist')
+    expect(await call(client, 'round_record', { title: 'x', claims: ['lib'] })).toContain('Rejected: `claims` needs `files`')
+    expect(await call(client, 'graph_history', { limit: 1 })).toBe(before)
+    // the round: one event for the change, one carry for the judgments it does not concern
+    const r = await call(client, 'round_record', { key: 'fix-1', title: 'lib fix', detail: 'lib.ts v2; suite green', files: ['lib.ts'], claims: ['lib'] })
+    expect(r).toContain('Applied: Round(fix-1) (round: lib fix); Carry(fix-1)')
+    expect(r).toContain('Carried on your word, not re-examined: group, docs — pins moved over lib.ts.')
+    expect(r).toContain('Left stale for re-examination: lib — reverify each with round "fix-1"')
+    expect(r).toContain('Stale: 1 judgment(s)')
+    const audit = await call(client, 'graph_audit')
+    expect(audit).toContain("Evidence audit (1 judgment(s) resting on changed artifacts, 2 carried on the agent's word)")
+    expect(audit).toContain('- lib: STALE? — since no-git, 1 artifact: lib.ts changed')
+    expect(audit).toContain("- docs: intact — 2 artifact(s) unchanged since no-git, 2 artifacts (pin carried at #8 on round fix-1 — on the agent's word, not re-examined)")
+    expect(await call(client, 'graph_history', { node: 'docs' })).toContain('#8 pin carried over lib.ts on round fix-1 — not re-examined [pinned no-git, 2 artifacts]')
+    expect(await call(client, 'graph_state', { node: 'docs' })).toContain('[pinned no-git, 2 artifacts] — pin carried at #8 on round fix-1, not re-examined')
+    expect(await call(client, 'graph_history', { limit: 1 })).toContain("8. Carry(fix-1) — carry: group, docs carried over lib.ts — pins moved on the agent's word, not re-examined")
+    // the named claim is re-examined against the round, and the carry is then superseded by a judgment
+    expect(await call(client, 'reverify', { id: 'lib', evidence: 'lib.ts v2 reviewed', round: 'fix-1', artifacts: ['lib.ts'] })).toContain('Verify(lib)=valid [Reverify(lib)]')
+    expect(await call(client, 'graph_audit')).toContain('Evidence audit (0 judgment(s) resting on changed artifacts, 2 carried')
+    // a round naming a claim that does not pin the file says so; a change nobody pins carries nothing
+    const r2 = await call(client, 'round_record', { title: 'docs only', files: ['docs.md'], claims: ['lib'] })
+    expect(r2).toContain('No valid judgment pinned to docs.md moved; nothing carried.')
+    expect(r2).toContain('Named but not pinned to docs.md: lib')
+    // a change with no round: the old price, every judgment on the file stale
+    writeFileSync(join(dir, 'lib.ts'), 'v3\n')
+    expect(await call(client, 'graph_audit')).toContain('Evidence audit (3 judgment(s) resting on changed artifacts')
+  })
+
+  it('PIN-3: a folder on a claim with parts is refused with no event written; a file its part pins is applied with the part named; graph_audit lists shared pins', async () => {
+    const { dir, client } = await project()
+    mkdirSync(join(dir, 'sub'))
+    writeFileSync(join(dir, 'sub', 'x.ts'), 'v1\n')
+    await call(client, 'verify', { id: 'lib', result: 'valid', evidence: 'lib.ts reviewed', artifacts: ['lib.ts'] })
+    const before = await call(client, 'graph_history', { limit: 1 })
+    const refused = await call(client, 'verify', { id: 'group', result: 'valid', evidence: 'its part holds', artifacts: ['sub'] })
+    expect(refused).toContain("Refused: 'sub' is a folder and this claim has parts (PIN-3)")
+    expect(refused).toContain('Pass no artifacts to rest on the parts')
+    expect(await call(client, 'graph_history', { limit: 1 })).toBe(before)
+    expect(await call(client, 'graph_state', { node: 'group' })).toContain('- group [pending')
+    // the same on reverify, once the group is judged
+    const dup = await call(client, 'verify', { id: 'group', result: 'valid', evidence: 'its part holds, and lib.ts read', artifacts: ['lib.ts'] })
+    expect(dup).toContain('[pinned no-git, 1 artifact]')
+    expect(dup).toContain("'lib.ts' is already pinned by part 'lib'")
+    expect(await call(client, 'reverify', { id: 'group', evidence: 'again', artifacts: ['sub'] })).toContain('Refused:')
+    // three judgments on one file: the audit says so, widest first
+    await call(client, 'verify', { id: 'docs', result: 'valid', evidence: 'docs.md and lib.ts read together', artifacts: ['lib.ts', 'docs.md'] })
+    const audit = await call(client, 'graph_audit')
+    expect(audit).toContain('Shared pins — one change stales every claim on the line:')
+    expect(audit).toContain('    lib.ts: 3 claims (group, lib, docs)')
+    expect(audit).not.toContain('docs.md:')
   })
 
   it('pins are what the judgment was given: explicit artifacts are the whole set; a claim with parts pins nothing from prose; a leaf falls back to its prose', async () => {

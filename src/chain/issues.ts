@@ -26,6 +26,8 @@ export interface Issue {
 
 export function readIssues(chain: EventChain, upToSeq?: number): Issue[] {
   const byKey = new Map<string, Issue>()
+  // issues from before this segment come from its checkpoint, as they stood at the roll
+  for (const i of chain.checkpoint?.issues ?? []) if (upToSeq === undefined || i.openedAt <= upToSeq) byKey.set(i.key, { ...i })
   for (const ev of chain.chain()) {
     if (upToSeq !== undefined && ev.seq > upToSeq) break
     const op = ev.op

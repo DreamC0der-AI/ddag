@@ -8,8 +8,9 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import { discard, merge, refute, restructure, revert, reverify, substitute } from '../chain/epistemic'
 import { composeClaim, parseClaim } from '../chain/claim'
-import { collectProvenance, gitState } from './provenance'
+import { collectProvenance, gitState, type PartPin } from './provenance'
 import { chainPathWithin } from './containment'
+import { openChainPath, type OpenedChain } from './folder'
 import { Registry } from './registry'
 import { McpStore } from './store'
 
@@ -43,16 +44,16 @@ DISCIPLINES:
 - Repair cheapest-first: wait for Restore (intact nodes heal on their own) > revert > re-verify > restructure.
 - Decompose to the evidence boundary and stop: every "because" in a claim's verification argument must point at evidence or a declared part. Prefer deep narrow structure over wide conjunctions. Decompose finely where change is expected; mirror real code structure when recording what exists.
 - Verify only after actually examining evidence; record invalid honestly. Reopen a stale-but-unchanged claim with doubt, never with a cosmetic mutate.
-- Every verify is pinned to the code state (git HEAD + hashes of the files it cites — mention paths in the evidence or pass artifacts). A claim WITH PARTS rests on its parts: cite the parts in its evidence, not files, so a code change under a leaf does not also stale every ancestor; the audit reports such a node as resting on parts. The standing line says "Stale: N" whenever judgments rest on code that changed since; graph_audit names them and shows what changed since each pin (hunks with their function names) — read that before re-examining. A stale judgment whose claim still holds is re-judged in one call with reverify; a valid claim a finding has shown false is withdrawn and judged in one call with refute. Verifying the root over stale judgments is allowed but warned. Fingerprints never see code; this does.
+- Every verify is pinned to the code state (git HEAD + hashes of the files it cites — mention paths in the evidence or pass artifacts). A claim WITH PARTS rests on its parts: cite the parts in its evidence, not files, so a code change under a leaf does not also stale every ancestor; the audit reports such a node as resting on parts. A folder passed as an artifact on a claim with parts is refused; a file passed there is pinned, and the reply names any part that already pins it. graph_audit also lists the files three or more judgments pin — where one change fans out. The standing line says "Stale: N" whenever judgments rest on code that changed since; graph_audit names them and shows what changed since each pin (hunks with their function names) — read that before re-examining. A stale judgment whose claim still holds is re-judged in one call with reverify; a valid claim a finding has shown false is withdrawn and judged in one call with refute. Verifying the root over stale judgments is allowed but warned. Fingerprints never see code; this does.
 - When every issue on an invalid claim is closed, the standing line lists it as ready to re-verify — the fix is in, the judgment is not.
 - Findings are recorded, not just judged: when an audit, a review or a failing check finds something wrong, issue_open records it with its full detail (key, title, severity, the claim it concerns) so it shows on the dashboard's issue pane; judge the refuted claim invalid as well. A fix closes the issue (issue_close, outcome fixed, what changed) and re-verifies the claim. Never add a "bug" node — a bug is not a part of correctness. issue_list is the fixer's worklist; the standing line counts open issues.
 - A working version is a record too: after the commit that concludes it, version_mark names it (v0.3) with a note; version_list shows every version with what the chain said of it then. Mark after committing, not before.
 - A target that ships has two standing parts besides its build, added PENDING at decomposition time and written into the root's own criterion: an audit decomposed by property (AUDITING above), and a WALKTHROUGH — "a new user with only the README can do everything the README says". Verifying the root over their absence verifies "built", not "done"; their pending leaves on the frontier are the honest signal.
 - READ ONE CLAIM, NOT THE LOG: before re-judging a claim, graph_history {node} gives its own chain in a few lines; why {id} says what broke it; graph_history {since: N} catches up from the position the last standing line ended with ("at #N").
-- ROUNDS: after a change that stales several judgments, round_record it ONCE (what moved, how it was checked), then reverify each claim with round: <key> and ONE sentence about that claim, passing artifacts with the files THAT claim rests on — never the round's file list, never a shared paragraph. Explicit artifacts are the whole pin set; a claim with parts pins none.
+- ROUNDS: after a change, round_record it ONCE (what moved, how it was checked) with files (what the change touched) and claims (the claims the change belongs to). Every other valid judgment on those files is CARRIED — its pin moves to the new hashes on your word, recorded as a carry, never as a judgment — and only the named claims go stale: reverify each of those with round: <key> and ONE sentence about that claim, passing artifacts with the files THAT claim rests on — never the round's file list, never a shared paragraph. Name every claim the change could concern; a wrong attribution leaves a green claim unexamined, and the record shows the carry. A round without files carries nothing: every judgment on the changed files goes stale as before. Explicit artifacts are the whole pin set; a claim with parts pins none.
 - TARGETS: one chain, one main target (graph_new), and sub-targets for pipelines that consume the build rather than belong to it (publish, deploy) — target_new, target_switch, target_list. A sub-target is never a part of the main target: its wait must not read as the build being broken. A claim is judged in one home target and only used, by link, in another.
 - WALKTHROUGH: a claim, not a mechanism. The group is the README promise; each journey a real user takes is a leaf (install from a clean clone; first project to a solid root; a change that goes stale; an audit by the protocol; an issue opened and closed; a version marked), plus one leaf per tool or panel the journeys do not reach. Each leaf's Verify: names the observed outcome that counts. The tester session has NO source access, uses only the real interface (the tool over stdio, the dashboard, the binary) in a clean folder, and records: a journey that works is verified valid with the transcript written to a file and cited as evidence; one that breaks is refuted and issue_open records the exact steps and output; confusing-but-works is an issue at Low. The tester never fixes. Its workload is its own project with its own chain; the judgments go on the product's chain.
-- One project, one chain: everything about a folder — its build, its audits, its fixes — goes on the folder's ddag.json. Do not graph_new or graph_open a second chain for a sub-effort; add the sub-effort as a part of the root.
+- One project, one chain: everything about a folder — its build, its audits, its fixes — goes on the folder's chain (.ddag/chain.json; a ddag.json is migrated into it on first open). Do not graph_new or graph_open a second chain for a sub-effort; add the sub-effort as a part of the root. version_mark seals the live segment into .ddag/archive and starts the next from a checkpoint, so the standing line, the audit and every list read from the checkpoint plus the events since; graph_history says when a claim's earlier entries are in a sealed segment.
 - The root cannot be verified while undecomposed (P1) — decompose first.
 - A node's content is its claim plus, after "Verify:", the criterion that settles it (pass \`verify\` on add/mutate/graph_new). Both are fingerprinted: changing what counts as proof reopens the judgment. The "why" stays on the add's rationale.
 - Write evidence for a reader who was not there: outcome first, in plain words; numbers second; file paths so the judgment is pinned. No private shorthand.`
@@ -74,6 +75,12 @@ function groupNudge(store: McpStore, id: string, what: 'finding' | 'refutation')
 function partsAware(warnings: string[], parts: number, artifacts: number): string[] {
   if (parts === 0 || artifacts > 0) return warnings
   return warnings.filter((w) => !w.startsWith('0 artifacts pinned'))
+}
+
+/** What the pin rule needs about a node: whether it has parts (PIN-2) and what those parts pin (PIN-3). */
+function pinOpts(store: McpStore, id: string): { group: boolean; parts: PartPin[] } {
+  const parts = store.partPins(id)
+  return { group: parts.length > 0, parts }
 }
 
 export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}): McpServer {
@@ -212,7 +219,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
           .array(z.string())
           .optional()
           .describe(
-            'the files or directories THIS claim rests on (paths under the project root), pinned by content hash so graph_audit can tell when they change. When given, they are the whole pin set. Without them, a leaf falls back to the paths its evidence names; a claim with parts pins nothing and rests on its parts',
+            'the files or directories THIS claim rests on (paths under the project root), pinned by content hash so graph_audit can tell when they change. When given, they are the whole pin set. Without them, a leaf falls back to the paths its evidence names; a claim with parts pins nothing and rests on its parts — a folder passed on such a claim is refused',
           ),
         round: z.string().optional().describe('the key of the round_record this judgment cites — the change is described there once; the evidence here is one sentence about this claim'),
       },
@@ -228,7 +235,8 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
           text: 'Refused (doctrine P1, no trivial win): the root is undecomposed — verifying it bare would end the game without a single part on the record. Add its parts first.',
         })
       }
-      const { provenance, warnings: raw } = collectProvenance(evidence, artifacts ?? [], store.root, store.file, { group: g.has(id) && g.predecessors(id).length > 0 })
+      const { provenance, warnings: raw, refused } = collectProvenance(evidence, artifacts ?? [], store.root, store.file, pinOpts(store, id))
+      if (refused !== undefined) return text({ ok: false, text: `Refused: ${refused}` })
       const warnings = partsAware(raw, g.has(id) ? g.predecessors(id).length : 0, provenance.artifacts.length)
       const staleBelow = id === store.target() && result === 'valid' ? store.staleCount() : 0
       const nudge = result === 'invalid' ? groupNudge(store, id, 'refutation') : store.selfFixNudge(id)
@@ -251,7 +259,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
       inputSchema: {
         id: z.string(),
         evidence: z.string().min(1).describe('the finding — what was examined and what showed the claim false, for a reader who was not there'),
-        artifacts: z.array(z.string()).optional().describe('the files or directories the finding rests on; when given, they are the whole pin set — without them a leaf falls back to the paths its evidence names, and a claim with parts pins nothing'),
+        artifacts: z.array(z.string()).optional().describe('the files or directories the finding rests on; when given, they are the whole pin set — without them a leaf falls back to the paths its evidence names, and a claim with parts pins nothing (a folder passed on such a claim is refused)'),
         round: z.string().optional().describe('the key of the round_record this judgment cites — the change is described there once; the evidence here is one sentence about this claim'),
       },
     },
@@ -259,7 +267,8 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
       store.refresh()
       const home = store.notHome(id)
       if (home) return text({ ok: false, text: home })
-      const { provenance, warnings: raw } = collectProvenance(evidence, artifacts ?? [], store.root, store.file, { group: store.graph.has(id) && store.graph.predecessors(id).length > 0 })
+      const { provenance, warnings: raw, refused } = collectProvenance(evidence, artifacts ?? [], store.root, store.file, pinOpts(store, id))
+      if (refused !== undefined) return text({ ok: false, text: `Refused: ${refused}` })
       const warnings = partsAware(raw, store.graph.has(id) ? store.graph.predecessors(id).length : 0, provenance.artifacts.length)
       const nudge = groupNudge(store, id, 'refutation')
       const r = store.perform((chain) => refute(chain, id, evidence, provenance, round))
@@ -315,7 +324,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
       inputSchema: {
         id: z.string(),
         evidence: z.string().min(1).describe('what was examined today — the grounds of the fresh judgment, recorded on the chain'),
-        artifacts: z.array(z.string()).optional().describe('the files or directories THIS claim rests on; when given, they are the whole pin set — without them a leaf falls back to the paths its evidence names, and a claim with parts pins nothing'),
+        artifacts: z.array(z.string()).optional().describe('the files or directories THIS claim rests on; when given, they are the whole pin set — without them a leaf falls back to the paths its evidence names, and a claim with parts pins nothing (a folder passed on such a claim is refused)'),
         round: z.string().optional().describe('the key of the round_record this judgment cites — the change is described there once; the evidence here is one sentence about this claim'),
       },
     },
@@ -323,7 +332,8 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
       store.refresh()
       const home = store.notHome(id)
       if (home) return text({ ok: false, text: home })
-      const { provenance, warnings: raw } = collectProvenance(evidence, artifacts ?? [], store.root, store.file, { group: store.graph.has(id) && store.graph.predecessors(id).length > 0 })
+      const { provenance, warnings: raw, refused } = collectProvenance(evidence, artifacts ?? [], store.root, store.file, pinOpts(store, id))
+      if (refused !== undefined) return text({ ok: false, text: `Refused: ${refused}` })
       const warnings = partsAware(raw, store.graph.has(id) ? store.graph.predecessors(id).length : 0, provenance.artifacts.length)
       const selfFix = store.selfFixNudge(id)
       const r = store.perform((chain) => reverify(chain, id, evidence, provenance, round))
@@ -550,7 +560,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
         ...(git.dirty !== undefined ? { dirty: git.dirty } : {}),
         ...(note !== undefined ? { note } : {}),
       }
-      const r = store.dispatch(op)
+      const r = store.markVersion(op)
       if (!r.ok) return text(r)
       const warnings: string[] = []
       if (op.commit === undefined) warnings.push('no commit recorded — the project root is not a git repository, or git is unavailable; pass `commit` to name one')
@@ -613,9 +623,19 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
         key: z.string().min(1).optional().describe('the round\'s key, e.g. targets-round; assigned (R1, R2, ...) when omitted'),
         title: z.string().min(1).describe('one line: what this change was'),
         detail: z.string().optional().describe('what moved and how it was checked, in full'),
+        files: z
+          .array(z.string())
+          .optional()
+          .describe(
+            'the files the change touched (paths under the project root). With them, every valid judgment pinned to these files that is NOT named in `claims` is carried: its pin moves to the new hashes in one carry event, on your word, recorded as a carry and never as a judgment. Without them nothing is carried and every judgment on the changed files goes stale as usual',
+          ),
+        claims: z
+          .array(z.string())
+          .optional()
+          .describe('the claims this change belongs to — they are left stale for re-examination; reverify each with `round`. Name every claim the change could concern: a wrong attribution leaves a green claim unexamined'),
       },
     },
-    async ({ key, title, detail }) => text(store.roundRecord(key, title, detail)),
+    async ({ key, title, detail, files, claims }) => text(store.roundRecord(key, title, detail, files, claims)),
   )
 
   server.registerTool(
@@ -626,7 +646,7 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
       description:
         "Point the server at another project's chain file without restarting — runtime project switching. The path resolves against the server's working directory and must stay inside it. Opening a path with no existing file starts a fresh graph there (written on the first applied operation).",
       inputSchema: {
-        path: z.string().describe('chain file path, e.g. ./ddag.json or testbed/ddag.json'),
+        path: z.string().describe('a project folder (its .ddag/chain.json, migrating a ddag.json found there), or a chain file path for a single-file chain that never rolls'),
       },
     },
     async ({ path }) => {
@@ -639,9 +659,18 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
           isError: true,
         }
       }
-      store.switchFile(resolved)
+      let opened: OpenedChain
+      try {
+        opened = openChainPath(chainRoot, path)
+      } catch (e) {
+        return { content: [{ type: 'text' as const, text: `Refused: ${(e as Error).message}` }], isError: true }
+      }
+      store.switchFile(opened.file)
+      const migrated = opened.migrated
+        ? `\nMigrated: ${opened.migrated.from} moved into its .ddag folder as ${opened.migrated.segments} sealed segment(s) and the live chain (${opened.migrated.events} events, every number kept); the original is kept beside them as migrated-ddag.json.`
+        : ''
       return {
-        content: [{ type: 'text' as const, text: `Chain file: ${resolved}\n${store.standing()}` }],
+        content: [{ type: 'text' as const, text: `Chain file: ${opened.file}${migrated}\n${store.standing()}` }],
       }
     },
   )
@@ -719,8 +748,10 @@ export async function main(): Promise<void> {
   // default ./ddag.json resolved against the working directory: Claude Code
   // spawns local MCP servers in the project dir, so one no-argument
   // registration serves every project, each with its chain beside its code
-  const raw = process.argv[2] ?? process.env['DDAG_FILE'] ?? './ddag.json'
-  const file = resolve(process.cwd(), raw)
+  const raw = process.argv[2] ?? process.env['DDAG_FILE']
+  const opened = openChainPath(process.cwd(), raw)
+  const file = opened.file
+  if (opened.migrated) console.error(`ddag: migrated ${opened.migrated.from} into .ddag (${opened.migrated.segments} sealed segment(s), ${opened.migrated.events} events)`)
   // every chain this server loads or writes is registered for the dashboard
   const registry = new Registry()
   const store = new McpStore(file, process.cwd(), (f) => {

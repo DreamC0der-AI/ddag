@@ -359,15 +359,16 @@ function DetailPanel({ id, onSelect, onReveal }: { id: string | null; onSelect: 
             {(() => {
               const a = sim.auditOf(id)
               if (!a) return null
+              const carried = a.carried ? ` Pin carried at #${a.carried.seq} on round ${a.carried.round} — on the agent's word, not re-examined.` : ''
               const text =
                 a.status === 'stale'
                   ? `STALE — since ${a.pin}: ${
                       a.diffs && a.diffs.length > 0
                         ? a.diffs.map(describeDiff).join('; ')
                         : a.changed.map((p) => `${p} changed`).join(', ')
-                    }${a.missing.length > 0 ? `${a.changed.length > 0 ? '; ' : ''}${a.missing.map((p) => `${p} missing`).join(', ')}` : ''}. Re-examine what changed; reverify if the claim still holds, refute if not.`
+                    }${a.missing.length > 0 ? `${a.changed.length > 0 ? '; ' : ''}${a.missing.map((p) => `${p} missing`).join(', ')}` : ''}. Re-examine what changed; reverify if the claim still holds, refute if not.${carried}`
                   : a.status === 'intact'
-                    ? `pinned ${a.pin}, all unchanged since`
+                    ? `pinned ${a.pin}, all unchanged since.${carried}`
                     : a.status === 'parts'
                       ? `rests on its ${a.parts} part(s) — each carries its own pin; a part's restatement reopens this claim`
                       : a.status === 'unwatched'
@@ -663,7 +664,7 @@ function ActionLog({ reveal }: { reveal: { seq: number; n: number } | null }) {
       ) : verbose ? (
         <ol className="log-list" ref={listRef}>
           {[...feed].reverse().map((e) => (
-            <li key={e.key} data-seqs={e.seq} className={`vlog-entry${e.op.type === 'round' ? ' log-round' : ''}${flash === e.seq ? ' log-flash' : ''}`}>
+            <li key={e.key} data-seqs={e.seq} className={`vlog-entry${e.op.type === 'round' || e.op.type === 'carry' ? ' log-round' : ''}${flash === e.seq ? ' log-flash' : ''}`}>
               <div className="vlog-head">
                 <span className="log-seq">{e.seq}</span>
                 <span className={`log-short kind-${kindOfEntry(e)}`}>{e.short}</span>
@@ -699,7 +700,7 @@ function ActionLog({ reveal }: { reveal: { seq: number; n: number } | null }) {
           {compactRows(feed)
             .reverse()
             .map(({ entry: e, doubt }) => {
-              const band = e.op.type === 'version' ? ' log-version' : e.op.type === 'round' ? ' log-round' : ''
+              const band = e.op.type === 'version' ? ' log-version' : e.op.type === 'round' || e.op.type === 'carry' ? ' log-round' : ''
               const lit = flash !== null && (flash === e.seq || flash === doubt?.seq)
               return (
                 <li
@@ -788,7 +789,21 @@ const ago = (iso: string): string => {
 
 /** / — every registered project at a glance; each card opens its live view at /p/<name>. */
 function Home() {
-  const { projects, error } = useProjects()
+  const { projects: listed, error } = useProjects()
+  // a removed entry leaves the page at once; the next poll confirms it
+  const [removed, setRemoved] = useState<Set<string>>(new Set())
+  const [removeError, setRemoveError] = useState<string | null>(null)
+  const projects = listed && listed.filter((p) => !removed.has(p.chain))
+  const remove = async (p: ProjectSummary) => {
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(p.name)}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? String(res.status))
+      setRemoved((s) => new Set(s).add(p.chain))
+      setRemoveError(null)
+    } catch (e) {
+      setRemoveError(`${p.name} was not removed: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
   return (
     <div className="app">
       <header className="toolbar">
@@ -814,6 +829,7 @@ function Home() {
             No projects registered yet. Open any folder in Claude Code and use ddag — its chain registers itself.
           </p>
         )}
+        {removeError && <p className="panel-empty home-remove-error">{removeError}</p>}
         {projects && projects.length > 0 && (
           <ul className="home-list">
             {projects.map((p) => (
@@ -850,6 +866,20 @@ function Home() {
                     {!p.exists && <span className="home-missing">chain file missing</span>}
                     {p.error && <span className="home-missing">unreadable</span>}
                     <span className="home-ago">{ago(p.lastSeen)}</span>
+                    {!p.exists && (
+                      <button
+                        type="button"
+                        className="home-remove"
+                        title="remove this entry from the project list; no file is touched"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          void remove(p)
+                        }}
+                      >
+                        remove
+                      </button>
+                    )}
                   </div>
                   {p.rootClaim && <div className="home-claim">{p.rootClaim}</div>}
                   <div className="home-meta">

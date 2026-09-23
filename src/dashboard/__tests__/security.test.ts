@@ -12,8 +12,9 @@ const scratch = () => mkdtempSync(join(tmpdir(), 'ddag-sec-'))
 describe('security: the dashboard on hostile input', () => {
   let server: Server
   let base: string
+  let registry: Registry
   beforeAll(async () => {
-    const registry = new Registry(join(scratch(), 'projects.json'))
+    registry = new Registry(join(scratch(), 'projects.json'))
     const dir = join(scratch(), 'alpha')
     mkdirSync(dir)
     const store = new McpStore(join(dir, 'ddag.json'), dir, (f) => registry.register(f))
@@ -102,5 +103,28 @@ describe('security: the dashboard on hostile input', () => {
       }
     }
     expect((server.address() as { address: string }).address).toBe('127.0.0.1')
+  })
+
+  it('sec-read-only: the one write, forgetting a missing project, is taken only from the dashboard\'s own page', async () => {
+    const { request } = await import('node:http')
+    const port = (server.address() as { port: number }).port
+    const del = (headers: Record<string, string>) =>
+      new Promise<number>((ok) => {
+        const req = request({ host: '127.0.0.1', port, path: '/api/projects/gone', method: 'DELETE', headers }, (res) => {
+          res.resume()
+          ok(res.statusCode ?? 0)
+        })
+        req.end()
+      })
+    registry.register(join(scratch(), 'gone', 'ddag.json'))
+    // a rebound DNS name reaches the loopback socket under its own Host
+    expect(await del({ host: `evil.example:${port}` })).toBe(403)
+    // another site's page names itself in Origin
+    expect(await del({ host: `127.0.0.1:${port}`, origin: 'http://evil.example' })).toBe(403)
+    // the preflight such a page would need is never granted
+    expect((await fetch(`${base}/api/projects/gone`, { method: 'OPTIONS' })).status).toBe(405)
+    expect(registry.find('gone')).toBeDefined()
+    expect(await del({ host: `localhost:${port}`, origin: `http://localhost:${port}` })).toBe(200)
+    expect(registry.find('gone')).toBeUndefined()
   })
 })

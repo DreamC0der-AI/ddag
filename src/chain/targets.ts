@@ -59,7 +59,10 @@ export function homesOf(chain: EventChain): Map<NodeId, NodeId> {
   const targets = targetsOf(chain)
   const main = targets[0]!
   const sticky = new Map<NodeId, NodeId>()
-  for (const n of chain.snapshotAt(0).nodes) if (n.id !== p) sticky.set(n.id, main)
+  // nodes from before this segment: their homes come with the checkpoint, since the add events that said so are sealed;
+  // on an unrolled chain, or a keyframe without them, whatever is in the initial snapshot belongs to the main target
+  const inherited = chain.checkpoint?.homes
+  for (const n of chain.snapshotAt(chain.base).nodes) if (n.id !== p) sticky.set(n.id, inherited?.[n.id] ?? main)
   for (const e of chain.chain()) {
     if (e.op.type !== 'add') continue
     const s = e.op.successor
@@ -100,5 +103,7 @@ export function migrateToProject(dump: ChainDump, projectContent: string, projec
     nodes: [{ id: projectId, content: projectContent, version: 0, verdict: 'pending', fingerprint: null }, ...initial.nodes],
     arcs: [...initial.arcs, { from: initial.root, to: projectId }],
   }
-  return { initial: keyframe, events: dump.events, meta: { project: projectId } }
+  const out: ChainDump = { initial: keyframe, events: dump.events, meta: { project: projectId } }
+  if (dump.checkpoint !== undefined) out.checkpoint = dump.checkpoint // a rolled chain keeps its position and memos
+  return out
 }

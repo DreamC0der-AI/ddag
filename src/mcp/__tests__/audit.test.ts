@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { EventChain } from '../../chain/chain'
-import { auditChain, collectProvenance, diffSincePin } from '../provenance'
+import { auditChain, collectProvenance, diffSincePin, lastPin } from '../provenance'
 
 const scratch = () => mkdtempSync(join(tmpdir(), 'ddag-audit-'))
 const git = (cwd: string, ...args: string[]) =>
@@ -128,6 +128,71 @@ describe('audit — what changed under a judgment, and what a judgment rests on'
     // code under the folder moves: still watched
     writeFileSync(join(dir, 'greet.sh'), 'echo goodbye\n')
     expect(auditChain(chain, dir, { chainFile }).nodes['n1']).toMatchObject({ status: 'stale', changed: ['.'] })
+  })
+
+  it('PIN-3: a folder on a claim with parts is refused, a file a part already pins is named, a file no part pins is quiet', () => {
+    const dir = scratch()
+    mkdirSync(join(dir, 'src'))
+    writeFileSync(join(dir, 'src', 'a.ts'), 'a\n')
+    writeFileSync(join(dir, 'src', 'b.ts'), 'b\n')
+    const parts = [{ id: 'p1', artifacts: ['src/a.ts'] }]
+    for (const folder of ['src', '.']) {
+      const r = collectProvenance('judged on its parts', [folder], dir, undefined, { group: true, parts })
+      expect(r.refused).toContain(`'${folder}' is a folder and this claim has parts (PIN-3)`)
+      expect(r.provenance.artifacts).toEqual([])
+    }
+    const dup = collectProvenance('judged on p1 and the file', ['src/a.ts'], dir, undefined, { group: true, parts })
+    expect(dup.refused).toBeUndefined()
+    expect(dup.provenance.artifacts.map((a) => a.path)).toEqual(['src/a.ts'])
+    expect(dup.warnings).toContainEqual(expect.stringContaining("'src/a.ts' is already pinned by part 'p1'"))
+    const own = collectProvenance('judged on p1 and its own file', ['src/b.ts'], dir, undefined, { group: true, parts })
+    expect(own.refused).toBeUndefined()
+    expect(own.warnings.filter((w) => w.includes('already pinned'))).toEqual([])
+    // a leaf may still pin a folder: the rule is about claims with parts
+    expect(collectProvenance('ran the folder', ['src'], dir).refused).toBeUndefined()
+    // a folder outside the root is not looked at, let alone refused as a folder: the ordinary "not found" warning, nothing pinned
+    const outside = collectProvenance('judged on its parts', ['..', '/'], dir, undefined, { group: true, parts })
+    expect(outside.refused).toBeUndefined()
+    expect(outside.provenance.artifacts).toEqual([])
+    expect(outside.warnings.filter((w) => w.includes('not found under the project root'))).toHaveLength(2)
+  })
+
+  it("a node's pin is its last valid judgment or a later carry, whichever is later; the audit names the carry", () => {
+    const dir = scratch()
+    writeFileSync(join(dir, 'lib.ts'), 'v1\n')
+    const chain = EventChain.create('target', 'the target')
+    chain.dispatch({ type: 'add', id: 'a', content: 'a', successor: 'target' })
+    const p1 = collectProvenance('examined', ['lib.ts'], dir).provenance
+    chain.dispatch({ type: 'verify', id: 'a', result: 'valid' }, undefined, 'examined', p1)
+    expect(lastPin(chain, 'a')).toEqual({ provenance: p1 })
+    writeFileSync(join(dir, 'lib.ts'), 'v2\n')
+    expect(auditChain(chain, dir).nodes['a']).toMatchObject({ status: 'stale', changed: ['lib.ts'] })
+    chain.dispatch({ type: 'round', key: 'r1', title: 'lib changed' })
+    const p2 = collectProvenance('carried', ['lib.ts'], dir).provenance
+    chain.dispatch({ type: 'carry', round: 'r1', files: ['lib.ts'], pins: [{ id: 'a', provenance: p2 }] })
+    expect(lastPin(chain, 'a')).toEqual({ provenance: p2, carried: { seq: 4, round: 'r1' } })
+    const a = auditChain(chain, dir)
+    expect(a.nodes['a']).toMatchObject({ status: 'intact', carried: { seq: 4, round: 'r1' } })
+    expect(a.summary.carried).toBe(1)
+    // a fresh judgment supersedes the carry
+    chain.dispatch({ type: 'doubt', id: 'a' })
+    chain.dispatch({ type: 'verify', id: 'a', result: 'valid' }, undefined, 'examined again', p2)
+    expect(lastPin(chain, 'a')).toEqual({ provenance: p2 })
+    expect(auditChain(chain, dir).summary.carried).toBe(0)
+  })
+
+  it('shared pins: a path three or more valid judgments pin is listed, widest first; two is not', () => {
+    const dir = scratch()
+    writeFileSync(join(dir, 'app.js'), 'v1\n')
+    writeFileSync(join(dir, 'lib.js'), 'v1\n')
+    const chain = EventChain.create('target', 'the target')
+    for (const id of ['a', 'b', 'c']) chain.dispatch({ type: 'add', id, content: id, successor: 'target' })
+    const pin = (files: string[]) => collectProvenance('examined', files, dir).provenance
+    chain.dispatch({ type: 'verify', id: 'a', result: 'valid' }, undefined, 'examined', pin(['app.js', 'lib.js']))
+    chain.dispatch({ type: 'verify', id: 'b', result: 'valid' }, undefined, 'examined', pin(['app.js', 'lib.js']))
+    expect(auditChain(chain, dir).shared).toEqual([])
+    chain.dispatch({ type: 'verify', id: 'c', result: 'valid' }, undefined, 'examined', pin(['app.js']))
+    expect(auditChain(chain, dir).shared).toEqual([{ path: 'app.js', nodes: ['a', 'b', 'c'] }])
   })
 
   it('a node with parts and no cited files rests on its parts; a leaf with none is unwatched', () => {

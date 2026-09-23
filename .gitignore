@@ -5,6 +5,7 @@ dist/
 
 # development record: the author's own chains and the projects built through DDAG
 ddag.json
+.ddag/
 testcases/
 testbed/
 .DS_Store

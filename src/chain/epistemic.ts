@@ -97,10 +97,13 @@ export function revert(chain: EventChain, id: NodeId, evidence?: string): Result
       return chain.dispatch({ type: 'mutate', id, content }, via, evidence)
     }
   }
+  // judged before this segment: the checkpoint remembers the content it was judged on
+  const memo = chain.checkpoint?.nodes[id]?.judged
+  if (memo !== undefined && memo.result === 'valid') return chain.dispatch({ type: 'mutate', id, content: memo.content }, via, evidence)
 
   // No verify event on this chain: it may start from a mid-history keyframe.
   // The initial snapshot's content is the verified one iff its hash matches.
-  const initial = chain.snapshotAt(0).nodes.find((n) => n.id === id)
+  const initial = chain.snapshotAt(chain.base).nodes.find((n) => n.id === id)
   if (initial && sha256Hex(initial.content) === fp.ownHash) {
     return chain.dispatch({ type: 'mutate', id, content: initial.content }, via, evidence)
   }

@@ -26,7 +26,8 @@ export interface Version {
 
 export function readVersions(chain: EventChain): Version[] {
   const events = chain.chain()
-  const out: Version[] = []
+  // versions from before this segment come from its checkpoint, with what the chain said of them then
+  const out: Version[] = (chain.checkpoint?.versions ?? []).map((v) => ({ ...v, eventsSince: chain.position - v.seq }))
   for (const ev of events) {
     const op = ev.op
     if (!isVersionOp(op)) continue
@@ -36,7 +37,7 @@ export function readVersions(chain: EventChain): Version[] {
       seq: ev.seq,
       rootSolid: g.solid(chain.project !== undefined && g.has(chain.project) ? (g.predecessors(chain.project)[0] ?? g.root) : g.root),
       openIssues: issueSummary(readIssues(chain, ev.seq)).open,
-      eventsSince: events.length - ev.seq,
+      eventsSince: chain.position - ev.seq,
     }
     if (chain.project !== undefined && g.has(chain.project)) v.targets = g.predecessors(chain.project).map((id) => ({ id, solid: g.solid(id) }))
     if (op.commit !== undefined) v.commit = op.commit

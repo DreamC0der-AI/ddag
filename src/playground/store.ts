@@ -21,6 +21,8 @@ export interface NodeAuditView {
   changed: string[]
   missing: string[]
   diffs?: { path: string; added: number; removed: number; where: string[]; approximate: boolean }[]
+  /** the pin was moved by a carry after the judgment: on the agent's word, not re-examined */
+  carried?: { seq: number; round: string }
 }
 
 /** "src/auth.rs: +12/-3 in sanitize_label" — what changed under a judgment since its pin. */
@@ -72,13 +74,14 @@ export type OperationKind = (typeof OPERATION_KINDS)[number]
 
 /** The epistemic operation a log entry belongs to: its composite marker when present, else its atom. */
 /** A log entry's kind: an epistemic operation, or an issue record (not an operation — the graph is unchanged). */
-export type EntryKind = OperationKind | 'Reverify' | 'Refute' | 'Issue' | 'Close' | 'Version' | 'Round'
+export type EntryKind = OperationKind | 'Reverify' | 'Refute' | 'Issue' | 'Close' | 'Version' | 'Round' | 'Carry'
 
 export function kindOfEntry(e: { op: ChainOp; via?: string }): EntryKind {
   if (e.via?.startsWith('Reverify(')) return 'Reverify'
   if (e.via?.startsWith('Refute(')) return 'Refute'
   if (e.op.type === 'version') return 'Version'
   if (e.op.type === 'round') return 'Round'
+  if (e.op.type === 'carry') return 'Carry'
   if (e.op.type === 'issue') return e.op.action === 'open' ? 'Issue' : 'Close'
   if (e.via) {
     const name = e.via.slice(0, e.via.indexOf('(') > 0 ? e.via.indexOf('(') : undefined)
@@ -354,20 +357,29 @@ class SimStore {
       if (!out.because && e.op.type === 'add' && e.op.id === id && e.evidence) out.because = e.evidence
       if (out.judged && out.because) break
     }
+    // judged or added before this segment: the checkpoint remembers
+    const memo = this.chain.checkpoint?.nodes[id]
+    if (!out.judged && memo?.judged) {
+      out.judged = { seq: memo.judged.seq, result: memo.judged.result }
+      if (memo.judged.evidence) out.judged.evidence = memo.judged.evidence
+      if (memo.judged.round !== undefined) out.judged.round = memo.judged.round
+      if (memo.judged.provenance) out.judged.pin = pinLabel(memo.judged.provenance)
+    }
+    if (!out.because && memo?.because) out.because = memo.because
     return out
   }
 
   /** A round record by its key: the change a judgment cites instead of repeating it. */
   roundOf(key: string): (RoundOp & { seq: number }) | null {
     for (const e of this.chain.chain()) if (isRoundOp(e.op) && e.op.key === key) return { ...e.op, seq: e.seq }
-    return null
+    const before = this.chain.checkpoint?.rounds.find((r) => r.key === key)
+    return before ? { type: 'round', key: before.key, title: before.title, seq: before.seq } : null
   }
 
   /** A claim's own chain as rows, oldest first, collapsed by the rules of renderNodeChain. */
   timelineOf(id: NodeId): TimelineRow[] {
-    const events = this.chain.chain()
     const said = (seq: number): Said => {
-      const ev = events[seq - 1]!
+      const ev = this.chain.eventAt(seq)!
       const text = (ev.evidence ?? '').replace(/\s+/g, ' ').trim()
       const first = text === '' ? null : firstSentence(text)
       return { seq, grounds: first, full: first !== null && first !== text ? text : null, round: ev.round ?? null }
@@ -589,7 +601,7 @@ class SimStore {
 
   /** Label of the live source, for the toolbar. */
   liveChainPath(): string {
-    return this.liveSource()?.label ?? 'ddag.json'
+    return this.liveSource()?.label ?? '.ddag/chain.json'
   }
 
   /**

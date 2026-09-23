@@ -14,8 +14,10 @@ import { Registry, type ProjectEntry } from '../mcp/registry'
  * The standalone dashboard: one long-running process that serves the built
  * web app and a READ-ONLY API over the project registry. It reads files
  * outside this repository, so it reads only registered chain paths, binds to
- * localhost, and never writes. Started once (`npm run dashboard`); tabs stay
- * live while Claude Code sessions come and go.
+ * localhost, and never writes to a project. Its one write is to its own
+ * registry: DELETE /api/projects/<name> forgets an entry whose chain file is
+ * gone. Started once (`npm run dashboard`); tabs stay live while Claude Code
+ * sessions come and go.
  */
 export interface ProjectSummary extends ProjectEntry {
   exists: boolean
@@ -87,7 +89,7 @@ export function summarize(entry: ProjectEntry): ProjectSummary {
       rootSolid: g.solid(main),
       frontier: perTarget[0]!.frontier,
       ...(project !== null ? { targets: perTarget } : {}),
-      events: events.length,
+      events: chain.position,
       lastEvent: last ? opNotation(last.op) : undefined,
       stale: auditFor(entry, chain).summary.stale,
       openIssues: issueSummary(readIssues(chain)).open,
@@ -127,6 +129,19 @@ const json = (res: ServerResponse, status: number, body: unknown) => {
   res.end(JSON.stringify(body))
 }
 
+/**
+ * A write is taken only from this dashboard's own page: the Host must be a
+ * loopback name (a rebound DNS name is not), and an Origin, when the browser
+ * sends one, must be that same host. DELETE is not a simple method, so another
+ * site's page is stopped at the preflight, which this server never grants.
+ */
+function sameLoopbackOrigin(req: IncomingMessage): boolean {
+  const host = req.headers.host ?? ''
+  if (!/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(host)) return false
+  const origin = req.headers.origin
+  return origin === undefined || origin === `http://${host}`
+}
+
 export function buildHandler(o: DashboardOptions): (req: IncomingMessage, res: ServerResponse) => void {
   const staticRoot = o.staticDir ? resolve(o.staticDir) : null
   const handle = (req: IncomingMessage, res: ServerResponse): unknown => {
@@ -135,6 +150,15 @@ export function buildHandler(o: DashboardOptions): (req: IncomingMessage, res: S
       path = decodeURIComponent(new URL(req.url ?? '/', 'http://localhost').pathname)
     } catch {
       return json(res, 400, { error: 'malformed path' })
+    }
+    // the one write: forget a registry entry whose chain file is gone. No project file is touched.
+    if (req.method === 'DELETE' && path.startsWith('/api/projects/')) {
+      if (!sameLoopbackOrigin(req)) return json(res, 403, { error: 'not from this dashboard' })
+      const name = path.slice('/api/projects/'.length)
+      const outcome = name.includes('/') ? 'unknown' : o.registry.forget(name)
+      if (outcome === 'unknown') return json(res, 404, { error: `unknown project '${name}'` })
+      if (outcome === 'present') return json(res, 409, { error: `'${name}' still has its chain file; only a missing project can be removed` })
+      return json(res, 200, { removed: name })
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') return json(res, 405, { error: 'read-only' })
 

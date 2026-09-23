@@ -1,8 +1,9 @@
 import { existsSync, readFileSync } from 'node:fs'
-import { basename, resolve } from 'node:path'
+import { basename, relative, resolve, sep } from 'node:path'
 import { atomicWrite, withFileLock } from './lock'
 import { coneOf, homesOf, mainTarget, migrateToProject, projectOf, targetsOf } from '../chain/targets'
-import { EventChain, type ChainDump, type ChainOp, type Provenance } from '../chain/chain'
+import { EventChain, type CarryOp, type ChainDump, type ChainOp, type Provenance, type VersionOp } from '../chain/chain'
+import { folderOf, sealAt } from './folder'
 import { diffSnapshots, type SnapshotDiff } from '../chain/diff'
 import { fingerprintIntact, groundsLabel, issueText } from '../chain/explain'
 import { rankFrontier, type FrontierRank } from '../kernel/ordering'
@@ -11,7 +12,7 @@ import type { NodeId, Result, Snapshot } from '../kernel/types'
 import { opNotation } from '../chain/notation'
 import { eventsOf, firstSentence, nodeChain, renderEvents, renderNodeChain, roundTitle, type NodeEntry } from '../chain/reader'
 import { parseClaim } from '../chain/claim'
-import { auditChain, pinLabel, type ArtifactDiff } from './provenance'
+import { auditChain, gitState, hashPath, lastPin, lastPinnedPaths, pinLabel, resolveRoot, SHARED_PIN_MIN, type ArtifactDiff, type PartPin } from './provenance'
 import { issueSummary, issuesReport, nextIssueKey, readIssues, type Issue } from '../chain/issues'
 import { readVersions, versionsReport } from '../chain/versions'
 
@@ -43,6 +44,11 @@ export class McpStore {
     return this._file
   }
 
+  /** The .ddag folder this chain lives in, when it is a folder chain that rolls at version marks; null for a single file. */
+  get folder(): string | null {
+    return folderOf(this._file)
+  }
+
   /** Point the store at another chain file (runtime project switch — no restart). */
   switchFile(file: string): void {
     this._file = file
@@ -50,6 +56,32 @@ export class McpStore {
     this.seen = this.chain.length
     this.currentTarget = null
   }
+
+  /**
+   * Mark a version and, on a folder chain, roll: the live segment with the
+   * mark as its last event is sealed into the archive, and the live chain
+   * starts again from a checkpoint (chain-segments). Both writes happen under
+   * the chain's lock after catching up, so another session's events land in
+   * the sealed segment or after the checkpoint, never between.
+   */
+  markVersion(op: VersionOp): { ok: boolean; text: string } {
+    const folder = this.folder
+    if (folder === null) return this.dispatch(op)
+    let rolled: string | null = null
+    const r = this.perform((chain) => {
+      const v = chain.dispatch(op)
+      if (!v.ok) return v
+      const { archive, next, sealedEvents } = sealAt(folder, chain, op.name)
+      const cp = next.checkpoint!
+      rolled = `Rolled: ${sealedEvents} event(s) up to #${cp.seq} sealed into ${relative(this.root, archive)}; the live chain starts from a checkpoint (${Object.keys(cp.nodes).length} claims remembered, ${cp.issues.length} issues, ${cp.versions.length} versions, ${cp.rounds.length} rounds).`
+      this.pendingSegment = next
+      return v
+    })
+    return r.ok && rolled !== null ? { ok: true, text: `${r.text}\n${rolled}` } : r
+  }
+
+  /** set by markVersion inside perform: the next segment, written in place of the sealed one */
+  private pendingSegment: ChainDump | null = null
 
   // ---------- targets (src/chain/targets.ts): a reading of the shape, one at a time ----------
 
@@ -227,6 +259,16 @@ export class McpStore {
   }
 
   private save(): void {
+    if (this.pendingSegment !== null) {
+      // a roll: the sealed segment is already in the archive; the live file becomes the next segment
+      const next = this.pendingSegment
+      this.pendingSegment = null
+      atomicWrite(this._file, JSON.stringify(next))
+      this.chain = EventChain.replay(next)
+      this.seen = 0
+      this.onChain?.(this._file)
+      return
+    }
     atomicWrite(this._file, JSON.stringify(this.chain.dump()))
     this.onChain?.(this._file)
   }
@@ -255,7 +297,8 @@ export class McpStore {
       return this.reloadWhole(dump)
     }
     const mine = this.chain.chain()
-    const sameStart = JSON.stringify(dump.initial) === JSON.stringify(this.chain.dump().initial)
+    const sameStart =
+      JSON.stringify(dump.initial) === JSON.stringify(this.chain.dump().initial) && (dump.checkpoint?.seq ?? 0) === this.chain.base
     const prefixMatches =
       sameStart &&
       dump.events.length >= mine.length &&
@@ -384,7 +427,7 @@ export class McpStore {
     if (ranks.length === 0) {
       const bare = !g.solid(t) && g.predecessors(t).length === 0
       const note = this.recordNotes()
-      return `${head}: ${rootState}.${note} Frontier: ${bare ? '(empty — decompose the root first; a root with no parts is never judged)' : '(empty)'} · at #${this.chain.length}`
+      return `${head}: ${rootState}.${note} Frontier: ${bare ? '(empty — decompose the root first; a root with no parts is never judged)' : '(empty)'} · at #${this.chain.position}`
     }
     const issuesNote = this.recordNotes()
     const fmt = (r: FrontierRank): string => {
@@ -394,7 +437,7 @@ export class McpStore {
       if (r.unlocked.length > 0) parts.push(`unlocks ${r.unlocked.length}`)
       return parts.length > 0 ? `${r.id} (${parts.join(', ')})` : r.id
     }
-    return `${head}: ${rootState}.${issuesNote} Frontier (best judgment first): ${ranks.map(fmt).join(', ')} · at #${this.chain.length}`
+    return `${head}: ${rootState}.${issuesNote} Frontier (best judgment first): ${ranks.map(fmt).join(', ')} · at #${this.chain.position}`
   }
 
   /** The current target's frontier, ranked: its cone, minus what other targets judge. */
@@ -454,6 +497,12 @@ export class McpStore {
   }
 
   /** Valid judgments whose pinned artifacts changed or vanished since. */
+  /** What a node's parts pin today — the pin rule's duplicate check (PIN-3). Empty for a leaf. */
+  partPins(id: NodeId): PartPin[] {
+    const parts = this.graph.has(id) ? this.graph.predecessors(id) : []
+    return parts.map((p) => ({ id: p, artifacts: lastPinnedPaths(this.chain, p) }))
+  }
+
   staleCount(): number {
     const cone = this.cone()
     return Object.entries(auditChain(this.chain, this.root, { chainFile: this._file }).nodes).filter(([id, a]) => a.status === 'stale' && cone.has(id)).length
@@ -552,7 +601,7 @@ export class McpStore {
       if (h.because) lines.push(`    because: ${h.because}`)
       lines.push(
         h.judged
-          ? `    judged: ${h.judged.result}${h.judged.evidence ? ` — ${h.judged.evidence}` : ''}${h.judged.pin ? ` [pinned ${h.judged.pin}]` : ''}`
+          ? `    judged: ${h.judged.result}${h.judged.evidence ? ` — ${h.judged.evidence}` : ''}${h.judged.pin ? ` [pinned ${h.judged.pin}]` : ''}${h.judged.carried ? ` — ${h.judged.carried}` : ''}`
           : '    judged: never',
       )
       lines.push(`    parts: ${parts.length > 0 ? parts.join(', ') : '(leaf)'} · ${fp}`)
@@ -576,19 +625,20 @@ export class McpStore {
     const refused = this.refuseIfBroken()
     if (refused !== null) return refused
     const events = this.chain.chain()
-    if (events.length === 0) return 'No events yet — the chain is at genesis.'
+    if (this.chain.position === 0) return 'No events yet — the chain is at genesis.'
     const pin = (e: (typeof events)[number]) => (e.provenance ? pinLabel(e.provenance) : undefined)
     const render = { pin, ...(opts.full ? { full: true } : {}) }
     if (opts.node !== undefined) {
       const entries = nodeChain(this.chain, opts.node)
-      if (entries.length === 0) return `Rejected: no event on this chain names or reaches "${opts.node}"`
+      // a claim the segment has no event for may still be in the graph: its entries are sealed, and the checkpoint remembers it
+      if (entries.length === 0 && !this.graph.has(opts.node)) return `Rejected: no event on this chain names or reaches "${opts.node}"`
       const lines = renderNodeChain(this.chain, opts.node, render)
-      return [`History of ${opts.node} — ${entries.length} entries in ${lines.length} lines (chain at #${events.length}):`, ...lines].join('\n')
+      return [`History of ${opts.node} — ${entries.length} entries in ${lines.length} lines (chain at #${this.chain.position}):`, ...lines].join('\n')
     }
     let pool: readonly (typeof events)[number][] = opts.cone ? eventsOf(this.chain, this.cone()) : events
     if (opts.since !== undefined) pool = pool.filter((e) => e.seq > opts.since!)
     const tail = opts.since !== undefined && opts.limit === undefined ? pool : pool.slice(-(opts.limit ?? 30))
-    if (tail.length === 0) return `Nothing${opts.cone ? ` in target ${this.targetLabel(this.target())}` : ''} after #${opts.since ?? 0} — the chain is at #${events.length}.`
+    if (tail.length === 0) return `Nothing${opts.cone ? ` in target ${this.targetLabel(this.target())}` : ''} after #${opts.since ?? 0} — the chain is at #${this.chain.position}.`
     const grounds = (e: (typeof events)[number]) => {
       const g = e.evidence ?? issueText(e.op)
       return g ? `${groundsLabel(e.op)}: ${g}` : undefined
@@ -603,9 +653,8 @@ export class McpStore {
     if (refused !== null) return refused
     const g = this.graph
     if (!g.has(id)) return `Rejected: node "${id}" does not exist`
-    const events = this.chain.chain()
     const said = (seq: number) => {
-      const e = events[seq - 1]!
+      const e = this.chain.eventAt(seq)!
       return `${e.evidence ? ` — ${firstSentence(e.evidence)}` : ''}${e.provenance ? ` [pinned ${pinLabel(e.provenance)}]` : ''}${e.round ? ` [round ${e.round}: ${roundTitle(this.chain, e.round) ?? '?'}]` : ''}`
     }
     const reason = (n: NodeId, depth: number): string[] => {
@@ -650,10 +699,76 @@ export class McpStore {
     return reason(id, 0).join('\n')
   }
 
-  /** Record a round: a change described once, cited by the judgments re-anchored after it (nc-round). */
-  roundRecord(key: string | undefined, title: string, detail?: string): { ok: boolean; text: string } {
-    const k = key ?? `R${this.chain.chain().filter((e) => e.op.type === 'round').length + 1}`
-    return this.dispatch({ type: 'round', key: k, title, ...(detail !== undefined ? { detail } : {}) })
+  /**
+   * Record a round: a change described once, cited by the judgments
+   * re-anchored after it (nc-round). With `files` — what the change touched —
+   * and `claims` — whose the change is — every other valid judgment pinned to
+   * those files is carried in one event (nc-carry): its pin moves to the new
+   * hashes on the agent's word, and only the named claims are left stale.
+   */
+  roundRecord(key: string | undefined, title: string, detail?: string, files?: string[], claims?: string[]): { ok: boolean; text: string } {
+    this.refresh()
+    const k = key ?? `R${(this.chain.checkpoint?.rounds.length ?? 0) + this.chain.chain().filter((e) => e.op.type === 'round').length + 1}`
+    if ((files === undefined || files.length === 0) && claims !== undefined && claims.length > 0)
+      return { ok: false, text: 'Rejected: `claims` needs `files` — name the files the change touched' }
+    const plan = files !== undefined && files.length > 0 ? this.planCarry(k, files, claims ?? []) : { carry: null, notes: [] }
+    if ('error' in plan) return { ok: false, text: `Rejected: ${plan.error}` }
+    const round: ChainOp = { type: 'round', key: k, title, ...(detail !== undefined ? { detail } : {}) }
+    const r = this.perform((chain) => {
+      const rr = chain.dispatch(round)
+      return rr.ok && plan.carry !== null ? chain.dispatch(plan.carry) : rr
+    })
+    return r.ok && plan.notes.length > 0 ? { ok: true, text: `${r.text}\n${plan.notes.join('\n')}` } : r
+  }
+
+  /**
+   * The carry a round would make: every valid judgment whose pin covers one
+   * of the changed files, minus the claims the change belongs to, re-pinned
+   * at today's hashes. Nothing is written here. A file that is not under the
+   * project, or is gone, refuses the round: a deleted file cannot be carried.
+   */
+  private planCarry(round: string, files: string[], claims: string[]): { carry: CarryOp | null; notes: string[] } | { error: string } {
+    const g = this.graph
+    for (const c of claims) if (!g.has(c)) return { error: `claim "${c}" does not exist` }
+    const rootReal = resolve(this.root)
+    const rel: string[] = []
+    for (const f of files) {
+      const abs = resolve(rootReal, f)
+      if (abs !== rootReal && !abs.startsWith(rootReal + sep)) return { error: `'${f}' is not under the project root (${rootReal})` }
+      if (!existsSync(abs)) return { error: `'${f}' does not exist under the project root — a deleted file cannot be carried; reverify the claims that pinned it` }
+      rel.push(relative(rootReal, abs) || '.')
+    }
+    const touches = (pinned: string) => rel.some((f) => pinned === f || pinned === '.' || f === '.' || f.startsWith(`${pinned}/`) || pinned.startsWith(`${f}/`))
+    const exclude = resolve(this._file)
+    const named = new Set(claims)
+    const pins: CarryOp['pins'] = []
+    const stale: NodeId[] = []
+    const untouched = claims.filter((c) => !lastPinnedPaths(this.chain, c).some(touches))
+    for (const id of g.ids()) {
+      if (g.verdict(id) !== 'valid') continue
+      const last = lastPin(this.chain, id)
+      if (!last || last.provenance.artifacts.length === 0) continue
+      const pinRoot = resolveRoot(last.provenance, rootReal)
+      const affected = last.provenance.artifacts.filter((a) => touches(a.path))
+      if (affected.length === 0) continue
+      if (affected.some((a) => !existsSync(resolve(pinRoot, a.path)))) {
+        stale.push(id) // an artifact vanished: only a re-examination can say what that means
+        continue
+      }
+      const artifacts = last.provenance.artifacts.map((a) => (touches(a.path) ? { path: a.path, hash: hashPath(resolve(pinRoot, a.path), exclude) } : a))
+      if (artifacts.every((a, i) => a.hash === last.provenance.artifacts[i]!.hash)) continue // nothing under this pin moved
+      if (named.has(id)) {
+        stale.push(id)
+        continue
+      }
+      pins.push({ id, provenance: { ...gitState(rootReal), artifacts, root: last.provenance.root ?? rootReal } })
+    }
+    const notes: string[] = []
+    if (pins.length > 0) notes.push(`Carried on your word, not re-examined: ${pins.map((p) => p.id).join(', ')} — pins moved over ${rel.join(', ')}.`)
+    if (stale.length > 0) notes.push(`Left stale for re-examination: ${stale.join(', ')} — reverify each with round "${round}" and one sentence about that claim.`)
+    if (untouched.length > 0) notes.push(`Named but not pinned to ${rel.join(', ')}: ${untouched.join(', ')} — nothing to reverify there.`)
+    if (pins.length === 0 && stale.length === 0) notes.push(`No valid judgment pinned to ${rel.join(', ')} moved; nothing carried.`)
+    return { carry: pins.length > 0 ? { type: 'carry', round, files: rel, pins } : null, notes }
   }
 
   /**
@@ -669,14 +784,16 @@ export class McpStore {
     const all = auditChain(this.chain, this.root, { diffs: true, chainFile: this._file })
     const cone = this.cone()
     const nodes = Object.fromEntries(Object.entries(all.nodes).filter(([id]) => cone.has(id)))
-    const summary = { stale: 0, unwatched: 0, parts: 0 }
+    const summary = { stale: 0, unwatched: 0, parts: 0, carried: 0 }
     for (const a of Object.values(nodes)) {
       if (a.status === 'stale') summary.stale++
       else if (a.status === 'unwatched') summary.unwatched++
       else if (a.status === 'parts') summary.parts++
+      if (a.carried) summary.carried++
     }
     const lines: string[] = []
     for (const [id, a] of Object.entries(nodes)) {
+      const carried = a.carried ? ` (pin carried at #${a.carried.seq} on round ${a.carried.round} — on the agent's word, not re-examined)` : ''
       switch (a.status) {
         case 'unpinned':
           lines.push(`- ${id}: unpinned — judged without provenance (Restore, or an older shell)`)
@@ -688,18 +805,28 @@ export class McpStore {
           lines.push(`- ${id}: rests on its ${a.parts} part(s) — each carries its own pin, and a part's restatement reopens this node`)
           break
         case 'intact':
-          lines.push(`- ${id}: intact — ${a.artifacts} artifact(s) unchanged since ${a.pin}`)
+          lines.push(`- ${id}: intact — ${a.artifacts} artifact(s) unchanged since ${a.pin}${carried}`)
           break
         case 'stale': {
           const what = [...a.changed.map((p) => `${p} changed`), ...a.missing.map((p) => `${p} missing`)].join(', ')
-          lines.push(`- ${id}: STALE? — since ${a.pin}: ${what} → reverify(${id}) if it still holds, refute(${id}) if not`)
+          lines.push(`- ${id}: STALE? — since ${a.pin}: ${what} → reverify(${id}) if it still holds, refute(${id}) if not${carried}`)
           for (const d of a.diffs ?? []) lines.push(`    ${describeDiff(d)}`)
         }
       }
     }
     if (lines.length === 0) return 'No valid judgments to audit.'
+    // where one change fans out: paths several judgments in this cone pin (PIN-3)
+    const shared = all.shared
+      .map((s) => ({ path: s.path, nodes: s.nodes.filter((id) => cone.has(id)) }))
+      .filter((s) => s.nodes.length >= SHARED_PIN_MIN)
+      .slice(0, 5)
+    if (shared.length > 0) {
+      lines.push(`Shared pins — one change stales every claim on the line:`)
+      for (const s of shared) lines.push(`    ${s.path}: ${s.nodes.length} claims (${s.nodes.join(', ')})`)
+      lines.push('    A file many claims pin is a file many claims are judged on; split it, or narrow each claim to what it rests on.')
+    }
     return [
-      `Evidence audit (${summary.stale} judgment(s) resting on changed artifacts${summary.unwatched > 0 ? `, ${summary.unwatched} unwatched` : ''}${summary.parts > 0 ? `, ${summary.parts} resting on parts` : ''}):`,
+      `Evidence audit (${summary.stale} judgment(s) resting on changed artifacts${summary.unwatched > 0 ? `, ${summary.unwatched} unwatched` : ''}${summary.parts > 0 ? `, ${summary.parts} resting on parts` : ''}${summary.carried > 0 ? `, ${summary.carried} carried on the agent's word` : ''}):`,
       ...lines,
       'A changed artifact does not refute a claim — it means the judgment was made against code that no longer exists. Re-examine, then doubt or re-verify.',
     ].join('\n')
@@ -710,19 +837,36 @@ export class McpStore {
   }
 
   /** Why the node exists (its Add rationale) and how it was last judged — read off the chain. */
-  nodeHistory(id: NodeId): { because?: string; judged?: { result: string; evidence?: string; pin?: string } } {
+  nodeHistory(id: NodeId): { because?: string; judged?: { result: string; evidence?: string; pin?: string; carried?: string } } {
     const events = this.chain.chain()
-    const out: { because?: string; judged?: { result: string; evidence?: string; pin?: string } } = {}
+    const out: { because?: string; judged?: { result: string; evidence?: string; pin?: string; carried?: string } } = {}
     for (let i = events.length - 1; i >= 0; i--) {
       const e = events[i]!
       if (!out.judged && e.op.type === 'verify' && e.op.id === id) {
         out.judged = { result: e.op.result }
         if (e.evidence) out.judged.evidence = e.round ? `[round ${e.round}: ${roundTitle(this.chain, e.round) ?? '?'}] ${e.evidence}` : e.evidence
-        if (e.provenance) out.judged.pin = pinLabel(e.provenance)
+        const current = e.op.result === 'valid' ? lastPin(this.chain, id) : undefined
+        if (current?.carried) {
+          out.judged.pin = pinLabel(current.provenance)
+          out.judged.carried = `pin carried at #${current.carried.seq} on round ${current.carried.round}, not re-examined`
+        } else if (e.provenance) out.judged.pin = pinLabel(e.provenance)
       }
       if (!out.because && e.op.type === 'add' && e.op.id === id && e.evidence) out.because = e.evidence
       if (out.judged && out.because) break
     }
+    // judged or added before this segment: the checkpoint remembers (chain-segments)
+    const memo = this.chain.checkpoint?.nodes[id]
+    if (!out.judged && memo?.judged) {
+      const j = memo.judged
+      out.judged = { result: j.result }
+      if (j.evidence) out.judged.evidence = j.round ? `[round ${j.round}: ${roundTitle(this.chain, j.round) ?? '?'}] ${j.evidence}` : j.evidence
+      const current = j.result === 'valid' ? lastPin(this.chain, id) : undefined
+      if (current?.carried) {
+        out.judged.pin = pinLabel(current.provenance)
+        out.judged.carried = `pin carried at #${current.carried.seq} on round ${current.carried.round}, not re-examined`
+      } else if (j.provenance) out.judged.pin = pinLabel(j.provenance)
+    }
+    if (!out.because && memo?.because) out.because = memo.because
     return out
   }
 

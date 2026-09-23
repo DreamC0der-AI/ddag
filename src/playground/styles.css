@@ -934,6 +934,27 @@ body {
   color: var(--ink-dim);
 }
 
+.home-remove {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 2px;
+  color: var(--ink-dim);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.home-remove:hover {
+  color: var(--broken);
+  border-color: var(--broken);
+  background: var(--broken-fill);
+}
+
+.home-remove-error {
+  color: var(--broken);
+}
+
 .home-claim {
   margin-top: 6px;
   font-size: 13px;
@@ -1448,6 +1469,7 @@ body {
 }
 
 .kind-Round { color: var(--k-round); }
+.kind-Carry { color: var(--k-round); }
 
 /* the Version band, quieter: a hairline and a tint */
 .log-entry.log-round,

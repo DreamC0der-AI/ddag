@@ -9,6 +9,8 @@ export function opNotation(op: ChainOp): string {
       return `Version(${op.name})`
     case 'round':
       return `Round(${op.key})`
+    case 'carry':
+      return `Carry(${op.round})`
     case 'add':
       return `Add(${op.id})`
     case 'link':
@@ -33,6 +35,8 @@ export function opShort(op: ChainOp): string {
       return `⚑${op.name}`
     case 'round':
       return `◆${op.key}`
+    case 'carry':
+      return `≡${op.round}`
     case 'add':
       return `+${op.id}`
     case 'link':

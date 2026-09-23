@@ -4,6 +4,7 @@ import { existsSync, lstatSync, mkdtempSync, readdirSync, readFileSync, realpath
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import type { EventChain, Provenance } from '../chain/chain'
+import { lastPin } from '../chain/pins'
 import type { NodeId } from '../kernel/types'
 
 /**
@@ -13,7 +14,8 @@ import type { NodeId } from '../kernel/types'
  * judgments rest on artifacts that have since changed.
  */
 
-const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', '.playwright-mcp'])
+// .ddag holds the chain and its archives: never code, and it changes with every event (chain-unpinned)
+const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', '.playwright-mcp', '.ddag'])
 const MAX_DIR_FILES = 500
 
 function hashFile(abs: string): string {
@@ -176,7 +178,17 @@ export function citedPaths(evidence: string, root: string): Cited {
 export interface Collected {
   provenance: Provenance
   warnings: string[]
+  /** PIN-3: set when the pin set must not be recorded at all — a folder pinned on a claim with parts */
+  refused?: string
 }
+
+/** A part's current pin, for the duplicate-pin warning on its group. */
+export interface PartPin {
+  id: NodeId
+  artifacts: string[]
+}
+
+export { lastPin, lastPinnedPaths, type LastPin } from '../chain/pins'
 
 /**
  * Pin the evidence's artifacts. `chainFile` is the chain this judgment is
@@ -190,11 +202,30 @@ export function collectProvenance(
   explicit: readonly string[],
   root: string,
   chainFile?: string,
-  opts: { group?: boolean } = {},
+  opts: { group?: boolean; parts?: PartPin[] } = {},
 ): Collected {
   // PIN-2: a judgment pins what it was given. Explicit artifacts, when present, are the whole pin
   // set; a claim with parts rests on its parts and pins nothing from its prose; only a leaf judged
   // without explicit artifacts falls back to the paths its evidence names.
+  // PIN-3: a folder is never pinned on a claim with parts — the folder holds the files its parts
+  // already watch, so the pin would stale the group on every change under it and say nothing new.
+  // The call is refused before anything is written. A file pinned there is allowed (a deliberate
+  // pin), but when a part already carries it the reply names that part.
+  if (opts.group === true) {
+    for (const p of explicit) {
+      // only a path the pin loop below would accept is looked at: contained on its real path, or
+      // repository-top-relative and landing inside the root — a path outside is never stat'ed
+      const abs = resolve(root, p)
+      const viaTop = inside(root, abs) && existsSync(abs) ? null : fromRepoTop(root, p)
+      const target = viaTop !== null ? resolve(root, viaTop) : inside(root, abs) && existsSync(abs) && containedReal(root, abs) !== null ? abs : null
+      if (target !== null && statSync(target).isDirectory())
+        return {
+          provenance: { ...gitState(root), artifacts: [], root: resolve(root) },
+          warnings: [],
+          refused: `'${p}' is a folder and this claim has parts (PIN-3): a folder pin would make it stale on every change under the folder, while its parts already carry their own pins. Pass no artifacts to rest on the parts, or add a leaf for what the folder covers.`,
+        }
+    }
+  }
   const fromProse = explicit.length === 0 && opts.group !== true
   const cited = fromProse ? citedPaths(evidence, root) : { paths: [] as string[], warnings: [] as string[] }
   const paths = new Set<string>(cited.paths)
@@ -218,6 +249,13 @@ export function collectProvenance(
       if (resolve(root, p) !== chainAbs) continue
       paths.delete(p)
       warnings.push(`'${p}' is the chain itself — not pinned (it changes with every operation, so citing it would mark this judgment stale at once)`)
+    }
+  }
+  if (opts.group === true && opts.parts !== undefined) {
+    for (const p of [...paths].sort()) {
+      const carriers = opts.parts.filter((part) => part.artifacts.includes(p)).map((part) => part.id)
+      if (carriers.length > 0)
+        warnings.push(`'${p}' is already pinned by part ${carriers.map((c) => `'${c}'`).join(', ')} — this claim will go stale with it; leave artifacts out to rest on the part, unless the pin is deliberate`)
     }
   }
   const exclude = chainFile === undefined ? undefined : resolve(chainFile)
@@ -313,11 +351,24 @@ export interface NodeAudit {
   missing: string[]
   /** per changed file, what changed since the pin — only when asked for (git is not free) */
   diffs?: ArtifactDiff[]
+  /** the pin was moved by a carry after the judgment: on the agent's word, not re-examined */
+  carried?: { seq: number; round: string }
 }
+
+/** A file pinned by several judgments: one change there stales them all. */
+export interface SharedPin {
+  path: string
+  nodes: NodeId[]
+}
+
+/** A path pinned by this many valid judgments or more is reported as shared. */
+export const SHARED_PIN_MIN = 3
 
 export interface ChainAudit {
   nodes: Record<NodeId, NodeAudit>
-  summary: { valid: number; intact: number; stale: number; unwatched: number; parts: number; unpinned: number }
+  summary: { valid: number; intact: number; stale: number; unwatched: number; parts: number; unpinned: number; carried: number }
+  /** paths pinned by SHARED_PIN_MIN or more valid judgments, the widest first — where one change fans out */
+  shared: SharedPin[]
 }
 
 /**
@@ -402,20 +453,13 @@ export function diffSincePin(root: string, commit: string, path: string): { adde
  */
 export function auditChain(chain: EventChain, defaultRoot: string, opts: { diffs?: boolean; chainFile?: string } = {}): ChainAudit {
   const g = chain.graph
-  const events = chain.chain()
   const nodes: Record<NodeId, NodeAudit> = {}
-  const summary = { valid: 0, intact: 0, stale: 0, unwatched: 0, parts: 0, unpinned: 0 }
+  const summary = { valid: 0, intact: 0, stale: 0, unwatched: 0, parts: 0, unpinned: 0, carried: 0 }
+  const pinnedBy = new Map<string, NodeId[]>()
   for (const id of g.ids()) {
     if (g.verdict(id) !== 'valid') continue
     summary.valid++
-    let last: (typeof events)[number] | undefined
-    for (let i = events.length - 1; i >= 0; i--) {
-      const e = events[i]!
-      if (e.op.type === 'verify' && e.op.id === id && e.op.result === 'valid') {
-        last = e
-        break
-      }
-    }
+    const last = lastPin(chain, id)
     const p = last?.provenance
     if (!p) {
       nodes[id] = { status: 'unpinned', artifacts: 0, changed: [], missing: [] }
@@ -434,12 +478,17 @@ export function auditChain(chain: EventChain, defaultRoot: string, opts: { diffs
       }
       continue
     }
+    for (const a of p.artifacts) pinnedBy.set(a.path, [...(pinnedBy.get(a.path) ?? []), id])
     const root = resolveRoot(p, defaultRoot)
     const audit = auditProvenance(p, root, opts.chainFile)
     const changed = audit.filter((a) => a.status === 'changed').map((a) => a.path)
     const missing = audit.filter((a) => a.status === 'missing').map((a) => a.path)
     const stale = changed.length + missing.length > 0
     const node: NodeAudit = { status: stale ? 'stale' : 'intact', pin, artifacts: p.artifacts.length, changed, missing }
+    if (last?.carried) {
+      node.carried = last.carried
+      summary.carried++
+    }
     if (stale && opts.diffs && p.head !== undefined) {
       node.diffs = []
       for (const path of changed) {
@@ -451,7 +500,11 @@ export function auditChain(chain: EventChain, defaultRoot: string, opts: { diffs
     if (stale) summary.stale++
     else summary.intact++
   }
-  return { nodes, summary }
+  const shared = [...pinnedBy.entries()]
+    .filter(([, ids]) => ids.length >= SHARED_PIN_MIN)
+    .map(([path, ids]) => ({ path, nodes: ids }))
+    .sort((a, b) => b.nodes.length - a.nodes.length || a.path.localeCompare(b.path))
+  return { nodes, summary, shared }
 }
 
 export interface ArtifactAudit {

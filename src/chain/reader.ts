@@ -1,5 +1,5 @@
 import type { NodeId } from '../kernel/types'
-import { isIssueOp, isRecordOp, isRoundOp, type ChainEvent, type EventChain } from './chain'
+import { isCarryOp, isIssueOp, isRecordOp, isRoundOp, type ChainEvent, type EventChain } from './chain'
 import { diffSnapshots } from './diff'
 import { opNotation } from './notation'
 
@@ -24,6 +24,7 @@ export type EntryKind =
   | 'doubted'
   | 'issue-opened'
   | 'issue-closed'
+  | 'carried'
   | 'reopened'
   | 'restored'
   | 'solid'
@@ -69,6 +70,10 @@ export function nodeIndex(chain: EventChain): Map<NodeId, NodeEntry[]> {
         const n = issueNode.get(op.key)
         if (n !== undefined) push(n, { seq, direct: true, kind: 'issue-closed', ref: op.key })
       }
+      continue
+    }
+    if (isCarryOp(op)) {
+      for (const p of op.pins) push(p.id, { seq, direct: true, kind: 'carried', ref: op.round })
       continue
     }
     if (isRecordOp(op)) continue
@@ -155,15 +160,17 @@ export interface RenderOptions {
 
 /** A claim's chain as lines: re-anchoring runs collapsed, the noise of re-anchorings beneath it counted, causes named. */
 export function renderNodeChain(chain: EventChain, id: NodeId, o: RenderOptions = {}): string[] {
-  const events = chain.chain()
   const text = (seq: number): string => {
-    const ev = events[seq - 1]!
+    const ev = chain.eventAt(seq)!
     const grounds = ev.evidence ?? ''
     const body = grounds === '' ? '' : ` — ${o.full ? grounds : firstSentence(grounds)}`
     const pin = o.pin?.(ev)
     return `${body}${pin ? ` [pinned ${pin}]` : ''}${ev.round ? ` [round ${ev.round}]` : ''}`
   }
   const lines: string[] = []
+  const cp = chain.checkpoint
+  if (cp !== undefined && chain.snapshotAt(chain.base).nodes.some((n) => n.id === id))
+    lines.push(`(entries up to #${cp.seq} are in the sealed segment${cp.parent ? ` ${cp.parent}` : ''}; the checkpoint remembers how it was last judged)`)
   let run: { count: number; first: number; last: number } | null = null
   let noise = 0
   let noiseLast = 0
@@ -225,6 +232,15 @@ export function renderNodeChain(chain: EventChain, id: NodeId, o: RenderOptions 
       case 'issue-closed':
         lines.push(`#${e.seq} issue ${e.ref} closed`)
         break
+      case 'carried': {
+        const ev = chain.eventAt(e.seq)!
+        const op = ev.op
+        if (!isCarryOp(op)) break
+        const own = op.pins.find((p) => p.id === id)
+        const pin = own ? o.pin?.({ ...ev, provenance: own.provenance }) : undefined
+        lines.push(`#${e.seq} pin carried over ${op.files.join(', ')} on round ${e.ref} — not re-examined${pin ? ` [pinned ${pin}]` : ''}`)
+        break
+      }
       case 'reopened':
         lines.push(`#${e.seq} reopened by ${e.cause!.op} (see ${e.cause!.node})`)
         break
@@ -276,5 +292,5 @@ export function eventsOf(chain: EventChain, ids: Iterable<NodeId>): ChainEvent[]
 
 export function roundTitle(chain: EventChain, key: string): string | undefined {
   for (const e of chain.chain()) if (isRoundOp(e.op) && e.op.key === key) return e.op.title
-  return undefined
+  return chain.checkpoint?.rounds.find((r) => r.key === key)?.title
 }

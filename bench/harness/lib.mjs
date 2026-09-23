@@ -3,9 +3,12 @@
 // so the same harness measures every version and the comparison is like for like.
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
+
+// the chain: .ddag/chain.json since 0.5, ddag.json before — a bench runs older versions too
+const chainFile = (dir) => (existsSync(join(dir, '.ddag', 'chain.json')) ? join(dir, '.ddag', 'chain.json') : join(dir, 'ddag.json'))
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 
@@ -66,7 +69,7 @@ export async function openSession(target, project) {
     steps.push(step)
     return { text, step }
   }
-  return { tools, startMs, steps, call, close: () => client.close(), chainBytes: () => statSync(join(project.dir, 'ddag.json')).size, chainEvents: () => JSON.parse(readFileSync(join(project.dir, 'ddag.json'), 'utf8')).events.length }
+  return { tools, startMs, steps, call, close: () => client.close(), chainBytes: () => statSync(chainFile(project.dir)).size, chainEvents: () => { const d = JSON.parse(readFileSync(chainFile(project.dir), 'utf8')); return (d.checkpoint?.seq ?? 0) + d.events.length } }
 }
 
 export const metric = (value, unit, better, label, note) => ({ value, unit, better, label, ...(note ? { note } : {}) })
