@@ -1470,6 +1470,7 @@ body {
 
 .kind-Round { color: var(--k-round); }
 .kind-Carry { color: var(--k-round); }
+.kind-Tag { color: var(--k-round); }
 
 /* the Version band, quieter: a hairline and a tint */
 .log-entry.log-round,

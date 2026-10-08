@@ -15,6 +15,7 @@ import { parseClaim } from '../chain/claim'
 import { auditChain, gitState, hashPath, lastPin, lastPinnedPaths, pinLabel, resolveRoot, SHARED_PIN_MIN, type ArtifactDiff, type PartPin } from './provenance'
 import { issueSummary, issuesReport, nextIssueKey, readIssues, type Issue } from '../chain/issues'
 import { readVersions, versionsReport } from '../chain/versions'
+import { partTags, readTags } from '../chain/tags'
 
 /**
  * MCP shell state: an EventChain persisted as a chain dump (initial snapshot +
@@ -571,9 +572,11 @@ export class McpStore {
       `${this.project() === null ? `Graph (root: ${g.root})` : `Target ${this.targetLabel(t)}${others.length > 0 ? ` (other targets: ${others.map((x) => this.targetLabel(x)).join(', ')}; target_switch to view)` : ''}`} — ${ids.length} nodes; ${mode}`,
     ]
     if (opts.node === undefined && !opts.full) lines.push('(graph_state {node} shows one node in full; {full: true} shows every node)')
+    const tags = readTags(this.chain)
     for (const id of ids) {
       const n = g.node(id)
-      const parts = g.predecessors(id)
+      const tagged = partTags(tags, id)
+      const parts = g.predecessors(id).map((p) => (tagged.has(p) ? `${p} (${tagged.get(p)!.join(', ')})` : p))
       const head = `- ${id} [${n.verdict}${g.solid(id) ? ', solid' : ''}]`
       const home = homes.get(id)
       const marks = [

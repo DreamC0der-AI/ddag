@@ -10,6 +10,7 @@ export function groundsLabel(op: ChainOp): string {
   if (op.type === 'version') return 'note'
   if (op.type === 'round') return 'round'
   if (op.type === 'carry') return 'carry'
+  if (op.type === 'tag') return 'rationale'
   if (op.type === 'issue') return op.action === 'open' ? 'finding' : 'resolution'
   return op.type === 'verify' || op.type === 'doubt' ? 'evidence' : 'rationale'
 }

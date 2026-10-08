@@ -11,6 +11,8 @@ export function opNotation(op: ChainOp): string {
       return `Round(${op.key})`
     case 'carry':
       return `Carry(${op.round})`
+    case 'tag':
+      return `Tag(${op.from}->${op.to})=${op.tags.length > 0 ? op.tags.join(',') : '∅'}`
     case 'add':
       return `Add(${op.id})`
     case 'link':
@@ -37,6 +39,8 @@ export function opShort(op: ChainOp): string {
       return `◆${op.key}`
     case 'carry':
       return `≡${op.round}`
+    case 'tag':
+      return `#${op.from}->${op.to}`
     case 'add':
       return `+${op.id}`
     case 'link':

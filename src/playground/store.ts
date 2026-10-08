@@ -74,7 +74,7 @@ export type OperationKind = (typeof OPERATION_KINDS)[number]
 
 /** The epistemic operation a log entry belongs to: its composite marker when present, else its atom. */
 /** A log entry's kind: an epistemic operation, or an issue record (not an operation — the graph is unchanged). */
-export type EntryKind = OperationKind | 'Reverify' | 'Refute' | 'Issue' | 'Close' | 'Version' | 'Round' | 'Carry'
+export type EntryKind = OperationKind | 'Reverify' | 'Refute' | 'Issue' | 'Close' | 'Version' | 'Round' | 'Carry' | 'Tag'
 
 export function kindOfEntry(e: { op: ChainOp; via?: string }): EntryKind {
   if (e.via?.startsWith('Reverify(')) return 'Reverify'
@@ -82,6 +82,7 @@ export function kindOfEntry(e: { op: ChainOp; via?: string }): EntryKind {
   if (e.op.type === 'version') return 'Version'
   if (e.op.type === 'round') return 'Round'
   if (e.op.type === 'carry') return 'Carry'
+  if (e.op.type === 'tag') return 'Tag'
   if (e.op.type === 'issue') return e.op.action === 'open' ? 'Issue' : 'Close'
   if (e.via) {
     const name = e.via.slice(0, e.via.indexOf('(') > 0 ? e.via.indexOf('(') : undefined)

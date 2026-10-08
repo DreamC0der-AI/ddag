@@ -58,6 +58,7 @@ describe('ddag MCP server', () => {
         'target_list',
         'why',
         'round_record',
+        'tag',
       ].sort(),
     )
   })
@@ -206,6 +207,21 @@ describe('ddag MCP server', () => {
     expect((await call(client, 'graph_audit')).text).toContain('- n1: intact')
     writeFileSync(join(dir, 'greet.sh'), 'echo goodbye\n')
     expect((await call(client, 'graph_audit')).text).toContain('- n1: STALE?')
+  })
+
+  it('tag: the weight of an arc is recorded without moving a verdict, shown beside the part, and refused off the graph', async () => {
+    const client = await connect(new McpStore(tmpFile()))
+    await call(client, 'add', { id: 'a', content: 'core holds', successor: 'target' })
+    await call(client, 'add', { id: 'b', content: 'docs ok', successor: 'target' })
+    await call(client, 'verify', { id: 'a', result: 'valid', evidence: 'examined' })
+    const r = await call(client, 'tag', { from: 'a', to: 'target', tags: ['strong'], rationale: 'the target stands or falls with the core' })
+    expect(r.text).toContain('Applied: Tag(a->target)=strong')
+    await call(client, 'tag', { from: 'b', to: 'target', tags: ['weak'] })
+    const state = (await call(client, 'graph_state', { full: true })).text
+    expect(state).toContain('parts: a (strong), b (weak)')
+    expect(state).toContain('- a [valid, solid]') // the tag moved no verdict
+    expect((await call(client, 'tag', { from: 'a', to: 'b', tags: ['weak'] })).text).toContain('no arc a->b')
+    expect((await call(client, 'graph_history', { node: 'target' })).text).toContain('its part a tagged strong')
   })
 
   it('graph_state is compact by default: one line per node with markers, frontier nodes in full, one node or all on request (TOK-1)', async () => {

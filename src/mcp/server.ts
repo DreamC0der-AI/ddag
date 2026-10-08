@@ -158,6 +158,28 @@ export function buildServer(store: McpStore, opts: { chainRoot?: string } = {}):
   )
 
   server.registerTool(
+    'tag',
+    {
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      title: 'Tag — say how strongly a whole rests on a part',
+      description:
+        'Set the tags of arc a->b: `strong` when b stands or falls with a, `weak` when a only contributes and b could be judged without it, or any other word the project uses for its arcs. A record, not an operation: no verdict moves, no claim reopens — the kernel treats every part alike; the tag is read by the views (graph_state lists it beside the part, the 3D graph draws strong arcs bright and weak ones dim). The tags given replace the arc\'s tags; an empty list clears them. A tag dies with its arc: unlinking drops it.',
+      inputSchema: {
+        from: z.string().describe('the part (a)'),
+        to: z.string().describe('the whole that rests on it (b)'),
+        tags: z.array(z.string().min(1)).describe('e.g. ["strong"] or ["weak"]; [] clears the arc\'s tags'),
+        rationale: z.string().optional().describe('why this weight — recorded on the chain'),
+      },
+    },
+    async ({ from, to, tags, rationale }) => {
+      store.refresh()
+      const out = store.notInCone(to, 'whole')
+      if (out) return text({ ok: false, text: out })
+      return text(store.dispatch({ type: 'tag', from, to, tags: tags.map((t) => t.trim()) }, rationale))
+    },
+  )
+
+  server.registerTool(
     'unlink',
     {
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },

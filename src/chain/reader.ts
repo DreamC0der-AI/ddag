@@ -1,5 +1,5 @@
 import type { NodeId } from '../kernel/types'
-import { isCarryOp, isIssueOp, isRecordOp, isRoundOp, type ChainEvent, type EventChain } from './chain'
+import { isCarryOp, isIssueOp, isRecordOp, isRoundOp, isTagOp, type ChainEvent, type EventChain } from './chain'
 import { diffSnapshots } from './diff'
 import { opNotation } from './notation'
 
@@ -25,6 +25,7 @@ export type EntryKind =
   | 'issue-opened'
   | 'issue-closed'
   | 'carried'
+  | 'tagged'
   | 'reopened'
   | 'restored'
   | 'solid'
@@ -74,6 +75,11 @@ export function nodeIndex(chain: EventChain): Map<NodeId, NodeEntry[]> {
     }
     if (isCarryOp(op)) {
       for (const p of op.pins) push(p.id, { seq, direct: true, kind: 'carried', ref: op.round })
+      continue
+    }
+    if (isTagOp(op)) {
+      push(op.to, { seq, direct: true, kind: 'tagged', ref: op.from })
+      push(op.from, { seq, direct: true, kind: 'tagged', ref: op.to })
       continue
     }
     if (isRecordOp(op)) continue
@@ -239,6 +245,13 @@ export function renderNodeChain(chain: EventChain, id: NodeId, o: RenderOptions 
         const own = op.pins.find((p) => p.id === id)
         const pin = own ? o.pin?.({ ...ev, provenance: own.provenance }) : undefined
         lines.push(`#${e.seq} pin carried over ${op.files.join(', ')} on round ${e.ref} — not re-examined${pin ? ` [pinned ${pin}]` : ''}`)
+        break
+      }
+      case 'tagged': {
+        const op = chain.eventAt(e.seq)!.op
+        if (!isTagOp(op)) break
+        const words = op.tags.length > 0 ? `tagged ${op.tags.join(', ')}` : 'untagged'
+        lines.push(op.to === id ? `#${e.seq} its part ${e.ref} ${words}${text(e.seq)}` : `#${e.seq} ${words} as a part of ${e.ref}${text(e.seq)}`)
         break
       }
       case 'reopened':

@@ -345,3 +345,7 @@
 
   A judgment pins what it was given: explicit artifacts, when present, are the whole pin set; a claim with parts rests on its parts and pins nothing from its prose; only a leaf judged without explicit artifacts falls back to the paths its evidence names. (Found on this repository's chain: a shared paragraph in every re-anchoring had pinned each judgment to eighteen files on average, so any edit staled nearly all of them.)
 
+
+  ## Arc tags
+
+  An arc is bare part-of to the kernel: a strong part and a weak one reopen and restore their whole alike. How strongly a whole rests on a part is a reading laid over the arc, so it is a *tag* record beside issues, versions and rounds (`src/chain/tags.ts`): `Tag(a->b)` sets the arc's tags, an empty list clears them. Inert to the kernel; refused unless the arc exists now, its words are non-empty and distinct, and it is not both `strong` and `weak`. A tag lives as long as its arc — an unlink, or a node dropped by the cascade, takes it along, and a relinked pair starts untagged. `strong` and `weak` are read as weight by the views; any other word is a label they only show. A roll's checkpoint carries the tags standing at the roll.

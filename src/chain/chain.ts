@@ -102,16 +102,31 @@ export interface CarryOp {
   pins: { id: NodeId; provenance: Provenance }[]
 }
 
-/** What a chain event can carry: a kernel operation, or a record (issue, version, round, carry). */
-export type ChainOp = Op | IssueOp | VersionOp | RoundOp | CarryOp
+/**
+ * An arc tag: words laid over an arc — how strongly b rests on a (strong,
+ * weak), or any other label the project gives its arcs. The kernel knows an
+ * arc as bare part-of and nothing of its weight, so a tag is a record: inert
+ * to the kernel, it lives as long as the arc it names and dies with it
+ * (src/chain/tags.ts). The tags given replace the arc's tags; none clears them.
+ */
+export interface TagOp {
+  type: 'tag'
+  from: NodeId
+  to: NodeId
+  tags: string[]
+}
+
+/** What a chain event can carry: a kernel operation, or a record (issue, version, round, carry, tag). */
+export type ChainOp = Op | IssueOp | VersionOp | RoundOp | CarryOp | TagOp
 
 export const isIssueOp = (op: ChainOp): op is IssueOp => op.type === 'issue'
 export const isVersionOp = (op: ChainOp): op is VersionOp => op.type === 'version'
 export const isRoundOp = (op: ChainOp): op is RoundOp => op.type === 'round'
 export const isCarryOp = (op: ChainOp): op is CarryOp => op.type === 'carry'
+export const isTagOp = (op: ChainOp): op is TagOp => op.type === 'tag'
 /** Records are events the kernel never sees: the snapshot after one is the snapshot before it. */
-export const isRecordOp = (op: ChainOp): op is IssueOp | VersionOp | RoundOp | CarryOp =>
-  op.type === 'issue' || op.type === 'version' || op.type === 'round' || op.type === 'carry'
+export const isRecordOp = (op: ChainOp): op is IssueOp | VersionOp | RoundOp | CarryOp | TagOp =>
+  op.type === 'issue' || op.type === 'version' || op.type === 'round' || op.type === 'carry' || op.type === 'tag'
 
 /**
  * Where a judgment was made: the code state its evidence was gathered
@@ -187,6 +202,8 @@ export interface Checkpoint {
   rounds: { key: string; title: string; seq: number }[]
   /** on a multi-target chain, the home target of every node at the roll — the add events that said so are sealed */
   homes?: Record<NodeId, NodeId>
+  /** the tagged arcs at the roll, when there are any */
+  tags?: { from: NodeId; to: NodeId; tags: string[] }[]
 }
 
 /** Serialized form: the initial snapshot plus the chain fully determine the graph; a checkpoint says what came before. */
@@ -261,6 +278,7 @@ export class EventChain {
     if (isVersionOp(op)) return this.recordVersion(op, evidence)
     if (isRoundOp(op)) return this.recordRound(op)
     if (isCarryOp(op)) return this.recordCarry(op)
+    if (isTagOp(op)) return this.recordTag(op, evidence)
     if (round !== undefined && !this.hasRound(round)) {
       const error = `round "${round}" is not recorded — round_record it first`
       this.rejections.push({ op, error })
@@ -330,7 +348,25 @@ export class EventChain {
     return { ok: true }
   }
 
-  private appendRecord(op: IssueOp | VersionOp | RoundOp | CarryOp, evidence?: string): void {
+  /**
+   * A tag names an arc the graph has now. Its words are trimmed, non-empty
+   * and distinct, and an arc is not both strong and weak.
+   */
+  private recordTag(op: TagOp, evidence?: string): Result {
+    const reject = (error: string): Result => {
+      this.rejections.push({ op, error })
+      return { ok: false, error }
+    }
+    if (!this.g.has(op.from) || !this.g.has(op.to) || !this.g.successors(op.from).includes(op.to))
+      return reject(`no arc ${op.from}->${op.to} — a tag names an arc the graph has`)
+    if (op.tags.some((t) => t.trim() !== t || t === '')) return reject('a tag is a non-empty word without surrounding spaces')
+    if (new Set(op.tags).size !== op.tags.length) return reject('a tag is given twice')
+    if (op.tags.includes('strong') && op.tags.includes('weak')) return reject('an arc is not both strong and weak')
+    this.appendRecord(op, evidence)
+    return { ok: true }
+  }
+
+  private appendRecord(op: IssueOp | VersionOp | RoundOp | CarryOp | TagOp, evidence?: string): void {
     const seq = this.position + 1
     const ev: ChainEvent = { seq, prev: seq - 1, op }
     if (evidence !== undefined) ev.evidence = evidence

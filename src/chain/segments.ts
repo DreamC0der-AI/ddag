@@ -4,6 +4,7 @@ import { readIssues } from './issues'
 import { readVersions } from './versions'
 import { lastPin } from './pins'
 import { homesOf } from './targets'
+import { readTags } from './tags'
 
 /**
  * Segments (chain-segments): a chain is rolled at a version mark into a
@@ -74,6 +75,8 @@ export function checkpointOf(chain: EventChain, o: { segment: number; parent?: s
   if (o.parent !== undefined) cp.parent = o.parent
   if (o.after !== undefined) cp.after = o.after
   if (chain.project !== undefined) cp.homes = Object.fromEntries(homesOf(chain)) // targets: every node's home survives the roll
+  const tags = [...readTags(chain).values()].map(({ from, to, tags }) => ({ from, to, tags }))
+  if (tags.length > 0) cp.tags = tags // arc tags survive the roll; the tag events that set them are sealed
   return cp
 }
 
