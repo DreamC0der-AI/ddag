@@ -252,6 +252,8 @@ file; nothing needs a refresh. Its sections, from the first screenshot:
 
 ### 3D view
 
+![The 3D view on a graph of 142 claims: one claim selected, its lineage lit in the scene and charted as a flow below](docs/screenshots/graph3d.png)
+
 `http://localhost:5199/p/<name>/3d` is the same chain as a 3D scene, for
 graphs too large for a plane; the toolbar's **2D | 3D** switch moves between
 the two. Drag to rotate, scroll to zoom, click a claim to light its lineage
