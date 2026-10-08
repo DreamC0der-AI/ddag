@@ -9,6 +9,7 @@ import { auditChain, type ChainAudit } from '../mcp/provenance'
 import { issueSummary, readIssues } from '../chain/issues'
 import { latestVersion, versionLabel } from '../chain/versions'
 import { Registry, type ProjectEntry } from '../mcp/registry'
+import { flatGraph } from '../graph3d/flat'
 
 /**
  * The standalone dashboard: one long-running process that serves the built
@@ -146,8 +147,11 @@ export function buildHandler(o: DashboardOptions): (req: IncomingMessage, res: S
   const staticRoot = o.staticDir ? resolve(o.staticDir) : null
   const handle = (req: IncomingMessage, res: ServerResponse): unknown => {
     let path: string
+    let query: URLSearchParams
     try {
-      path = decodeURIComponent(new URL(req.url ?? '/', 'http://localhost').pathname)
+      const url = new URL(req.url ?? '/', 'http://localhost')
+      path = decodeURIComponent(url.pathname)
+      query = url.searchParams
     } catch {
       return json(res, 400, { error: 'malformed path' })
     }
@@ -197,10 +201,25 @@ export function buildHandler(o: DashboardOptions): (req: IncomingMessage, res: S
       res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
       return res.end(raw)
     }
+    // the 3D view's data: one target's cone as nodes, arcs and arc tags, replayed here so the page carries no chain code
+    if (path.startsWith('/api/graph/')) {
+      const name = path.slice('/api/graph/'.length)
+      const entry = name.includes('/') ? undefined : o.registry.find(name)
+      if (!entry || !existsSync(entry.chain)) return json(res, 404, { error: `unknown project '${name}'` })
+      let chain: EventChain
+      try {
+        chain = loadChain(entry)!
+      } catch {
+        return json(res, 404, { error: `'${name}' is registered but its file is not a chain` })
+      }
+      const flat = flatGraph(chain, entry.name, query.get('target') ?? undefined)
+      if (flat === null) return json(res, 404, { error: `'${name}' has no such target` })
+      return json(res, 200, flat)
+    }
     if (path.startsWith('/api/')) return json(res, 404, { error: 'no such endpoint' })
 
     if (!staticRoot) return json(res, 404, { error: 'no web app built — run npm run build:dashboard' })
-    // static asset if it exists under the build dir (contained); otherwise the app shell — /, /p/<name>, /sandbox
+    // static asset if it exists under the build dir (contained); otherwise a shell — /, /p/<name>, /p/<name>/3d, /sandbox
     const asset = resolve(staticRoot, `.${path}`)
     // contained on the real path: a link planted in the build dir must not serve its target (SEC-STATIC-1)
     const real = (() => {
@@ -216,7 +235,8 @@ export function buildHandler(o: DashboardOptions): (req: IncomingMessage, res: S
       res.writeHead(200, { 'content-type': MIME[extname(asset)] ?? 'application/octet-stream' })
       return res.end(readFileSync(asset))
     }
-    const shell = join(staticRoot, 'index.html')
+    // /p/<name>/3d is the 3D view's own page; every other route is the app shell
+    const shell = join(staticRoot, /^\/p\/[^/]+\/3d\/?$/.test(path) ? 'graph3d.html' : 'index.html')
     if (!existsSync(shell)) return json(res, 404, { error: 'app shell missing' })
     res.writeHead(200, { 'content-type': MIME['.html']!, 'cache-control': 'no-store' })
     res.end(readFileSync(shell))

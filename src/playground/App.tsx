@@ -941,6 +941,23 @@ function ProjectSwitcher({ current }: { current: string | undefined }) {
   )
 }
 
+/** Toolbar switch between this project's 2D view and its 3D view (/p/<name>/3d, its own page); absent off a project. */
+function ViewSwitch() {
+  const sim = useSim()
+  const project = sim.liveSource()?.project
+  if (project === undefined) return null
+  const target = sim.currentTarget()
+  const query = target === sim.targets()[0] ? '' : `?target=${encodeURIComponent(target)}`
+  return (
+    <span className="view-switch" title="the same graph in 2D or in 3D">
+      <span className="btn view-on">2D</span>
+      <a className="btn" href={`/p/${encodeURIComponent(project)}/3d${query}`}>
+        3D
+      </a>
+    </span>
+  )
+}
+
 /** Toolbar jump between the chain's targets; absent on a legacy single-target chain. */
 function TargetSwitcher() {
   const sim = useSim()
@@ -1081,6 +1098,7 @@ function Workbench() {
           </a>
           <ProjectSwitcher current={sim.liveSource()?.project} />
           <TargetSwitcher />
+          <ViewSwitch />
 
           {/* the random stepper belongs to the sandbox; a project view is a dashboard, not a playground */}
           {!sim.liveSource() && (

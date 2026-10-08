@@ -17,6 +17,7 @@ describe('dashboard server', () => {
   let base: string
   let registry: Registry
   let chainA: string
+  let staticDir: string
 
   beforeAll(async () => {
     registry = new Registry(join(scratch(), 'projects.json'))
@@ -40,7 +41,7 @@ describe('dashboard server', () => {
     // a registered path whose file vanished
     registry.register(join(scratch(), 'ghost', 'ddag.json'))
 
-    const staticDir = scratch()
+    staticDir = scratch()
     mkdirSync(join(staticDir, 'assets'))
     writeFileSync(join(staticDir, 'index.html'), '<!doctype html><title>shell</title>')
     writeFileSync(join(staticDir, 'assets', 'app.js'), 'console.log(1)')
@@ -180,6 +181,43 @@ describe('dashboard server', () => {
     expect(byName['beta']).not.toHaveProperty('targets')
   })
 
+  it('/api/graph/<name> is one target\'s cone as a flat graph — claims, arcs and arc tags, the project node left out', async () => {
+    const dir = join(scratch(), 'theta')
+    mkdirSync(dir)
+    const chain = EventChain.replay(migrateToProject(EventChain.create('build', 'the build works\nevery package compiles').dump(), 'Project'))
+    chain.dispatch({ type: 'add', id: 'lib', content: 'lib works', successor: 'build' })
+    chain.dispatch({ type: 'verify', id: 'lib', result: 'valid' }, 'reviewed')
+    chain.dispatch({ type: 'add', id: 'publish', content: 'the build is published', successor: PROJECT_ID })
+    chain.dispatch({ type: 'add', id: 'npm', content: 'npm serves it', successor: 'publish' })
+    chain.dispatch({ type: 'link', from: 'lib', to: 'publish' })
+    chain.dispatch({ type: 'tag', from: 'lib', to: 'build', tags: ['strong'] })
+    chain.dispatch({ type: 'tag', from: 'lib', to: 'publish', tags: ['weak'] })
+    writeFileSync(join(dir, 'ddag.json'), JSON.stringify(chain.dump()))
+    registry.register(join(dir, 'ddag.json'))
+
+    // no target named: the main target's cone
+    const main = (await (await fetch(`${base}/api/graph/theta`)).json()) as Record<string, unknown>
+    expect(main).toMatchObject({ name: 'theta', position: 7, root: 'build', targets: ['build', 'publish'] })
+    expect(main['nodes']).toEqual([
+      { id: 'build', title: 'the build works', detail: 'every package compiles', verdict: 'pending', solid: false, root: true },
+      { id: 'lib', title: 'lib works', detail: '', verdict: 'valid', solid: true, root: false },
+    ])
+    expect(main['links']).toEqual([{ source: 'lib', target: 'build', tags: ['strong'] }]) // lib->publish leaves this cone
+    // a named target: its own cone, the shared part included, with the tag of the arc into this target
+    const pub = (await (await fetch(`${base}/api/graph/theta?target=publish`)).json()) as { root: string; nodes: { id: string }[]; links: unknown[] }
+    expect(pub.root).toBe('publish')
+    expect(pub.nodes.map((n) => n.id).sort()).toEqual(['lib', 'npm', 'publish'])
+    expect(pub.links).toContainEqual({ source: 'lib', target: 'publish', tags: ['weak'] })
+    expect(pub.links).toContainEqual({ source: 'npm', target: 'publish' })
+    // the project node is no target, and neither is a part
+    for (const t of [PROJECT_ID, 'lib', 'nope']) expect((await fetch(`${base}/api/graph/theta?target=${t}`)).status).toBe(404)
+    expect((await fetch(`${base}/api/graph/nope`)).status).toBe(404)
+    expect((await fetch(`${base}/api/graph/ghost`)).status).toBe(404)
+    expect((await fetch(`${base}/api/graph/a/b`)).status).toBe(404)
+    // a legacy single-target chain: its root is its one target
+    expect(await (await fetch(`${base}/api/graph/alpha`)).json()).toMatchObject({ root: 'target', targets: ['target'] })
+  })
+
   it('is read-only', async () => {
     expect((await fetch(`${base}/api/projects`, { method: 'POST' })).status).toBe(405)
   })
@@ -211,5 +249,11 @@ describe('dashboard server', () => {
       expect(await r.text()).toContain('<title>shell</title>')
     }
     expect((await fetch(`${base}/assets/../../etc/passwd`)).status).toBe(200) // normalised → shell, never a file outside
+  })
+
+  it('serves the 3D view\'s own page at /p/<name>/3d and the app shell everywhere else', async () => {
+    writeFileSync(join(staticDir, 'graph3d.html'), '<!doctype html><title>3d</title>')
+    for (const route of ['/p/alpha/3d', '/p/alpha/3d/', '/p/does-not-matter/3d']) expect(await (await fetch(`${base}${route}`)).text()).toContain('<title>3d</title>')
+    for (const route of ['/p/alpha', '/p/alpha/3dx', '/p/alpha/3d/more', '/3d']) expect(await (await fetch(`${base}${route}`)).text()).toContain('<title>shell</title>')
   })
 })

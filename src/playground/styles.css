@@ -119,6 +119,22 @@ body {
   background: var(--well);
 }
 
+/* 2D | 3D: two buttons joined, the view on show filled */
+.view-switch {
+  display: inline-flex;
+}
+.view-switch .btn {
+  text-decoration: none;
+}
+.view-switch .btn + .btn {
+  border-left: 0;
+}
+.view-switch .view-on {
+  background: var(--ink);
+  color: var(--panel);
+  cursor: default;
+}
+
 .btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;

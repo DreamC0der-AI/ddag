@@ -250,6 +250,15 @@ file; nothing needs a refresh. Its sections, from the first screenshot:
   event with its evidence on hover; verbose explains each event: what was
   done, its grounds, and what it changed. Versions show as bands.
 
+### 3D view
+
+`http://localhost:5199/p/<name>/3d` is the same chain as a 3D scene, for
+graphs too large for a plane; the toolbar's **2D | 3D** switch moves between
+the two. Drag to rotate, scroll to zoom, click a claim to light its lineage
+(everything it needs and everything that needs it) and chart it as a flow
+below; a lit set can be locked, or picked by hand. Arcs tagged `strong` are
+drawn bright and `weak` ones dim. It follows the file like the 2D view.
+
 The dashboard never writes to a project, serves only registered chain paths,
 and binds to localhost. Its one write is to its own list: a project whose chain
 file is gone shows a **remove** button, which drops that line from

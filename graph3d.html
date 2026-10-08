@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Decompose DAG 3D</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='40' fill='%23177b57'/%3E%3Ccircle cx='50' cy='50' r='16' fill='%23eceff3'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="/src/graph3d/graph3d.css" />
+  </head>
+  <body>
+    <div id="stage"></div>
+
+    <section id="hud" class="panel">
+      <div>
+        <div class="brand">
+          <div class="brand-dot"></div><div class="brand-name">Decompose DAG</div>
+          <nav class="viewsw" aria-label="view"><a href="/" title="all projects">⌂</a><a id="to-2d" href="/" title="the 2D view of this project">2D</a><b>3D</b></nav>
+        </div>
+        <div class="project-row"><div class="project" id="project">—</div><select id="target" title="switch target — the view shows one target's cone at a time" hidden></select></div>
+      </div>
+      <div class="stats" id="stats"></div>
+      <div class="rootline" id="rootline"></div>
+      <div class="search">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+        <input id="q" placeholder="Find a concept…" autocomplete="off" spellcheck="false" />
+        <kbd>/</kbd>
+        <div id="results" class="panel"></div>
+      </div>
+      <div class="ctl">
+        <label>Color</label>
+        <div class="seg" data-ctl="color"><button data-v="branch">Branch</button><button data-v="depth">Depth</button><button data-v="verdict">Verdict</button></div>
+        <label>Layout</label>
+        <div class="seg" data-ctl="layout"><button data-v="shells">Shells</button><button data-v="layers">Layers</button><button data-v="free">Free</button></div>
+        <label>Labels</label>
+        <div class="seg" data-ctl="labels"><button data-v="smart">Smart</button><button data-v="all">All</button><button data-v="off">Off</button></div>
+        <label>Quality</label>
+        <div class="seg" data-ctl="quality"><button data-v="standard">Standard</button><button data-v="high">High</button><button data-v="ultra">Ultra</button></div>
+      </div>
+      <div class="toggles">
+        <button class="tog" data-tog="rotate">Auto-rotate</button>
+        <button class="tog" data-tog="flow">Flow</button>
+        <button class="tog" data-tog="glow">Glow</button>
+        <button class="tog" data-tog="guides">Guides</button>
+      </div>
+      <div class="perf" id="perf" title="what the current quality costs: rendered pixels, anti-aliasing samples, estimated GPU memory for the render buffers, measured frame rate"></div>
+    </section>
+
+    <section id="legend" class="panel">
+      <div class="head"><h3 id="key-title">Branches</h3><span class="hint" id="key-hint">hover to trace · click to isolate</span></div>
+      <div id="key"></div>
+      <div class="encoding">
+        <div><svg class="glyph" viewBox="0 0 22 14"><circle cx="5" cy="7" r="3" fill="#8b90b0" /><circle cx="15" cy="7" r="6" fill="#8b90b0" /></svg>size = links</div>
+        <div><svg class="glyph" viewBox="0 0 22 14"><line x1="1" y1="7" x2="21" y2="7" stroke="#5a5f7d" /><circle cx="8" cy="7" r="1.8" fill="#fff" /><circle cx="16" cy="7" r="1.8" fill="#fff" /></svg>flow → needed by</div>
+        <div><svg class="glyph" viewBox="0 0 22 14"><circle cx="11" cy="7" r="6" fill="none" stroke="#8b90b0" stroke-dasharray="1 2" /><circle cx="11" cy="7" r="2.5" fill="none" stroke="#8b90b0" stroke-dasharray="1 2" /></svg>shell = depth</div>
+        <div><svg class="glyph" viewBox="0 0 22 14"><ellipse cx="11" cy="7" rx="10" ry="3.2" fill="none" stroke="#fff" stroke-opacity=".7" /><circle cx="11" cy="7" r="3.5" fill="#fff" /></svg>rings = root</div>
+        <div class="enc-wide"><b class="enc-dp">↓n</b>levels deep — the longest chain of needs below a branch</div>
+        <div class="enc-wide enc-links" id="enc-links"></div>
+      </div>
+    </section>
+
+    <aside id="detail" class="panel"><button class="close" aria-label="close">×</button><div id="detail-body"></div></aside>
+    <section id="flow" class="panel">
+      <div class="rz edge-ns" data-dir="n"></div><div class="rz edge-ns" data-dir="s"></div><div class="rz edge-ew" data-dir="e"></div><div class="rz edge-ew" data-dir="w"></div>
+      <div class="rz corner" data-dir="nw"></div><div class="rz corner" data-dir="ne"></div><div class="rz corner" data-dir="sw"></div><div class="rz corner" data-dir="se"></div>
+      <header>
+        <div class="f-title"><h3 id="flow-title">Lineage</h3><b id="flow-anchor"></b><span id="flow-count"></span></div>
+        <div class="f-actions">
+          <button id="lock" class="fbtn" title="lock the lit set (L) — clicks then move the rotation point inside it">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="4" y="11" width="16" height="10" rx="2" /><path id="lock-shackle" d="M8 11V7a4 4 0 0 1 8 0" /></svg><span>Lock set</span>
+          </button>
+          <button id="frame" class="fbtn" title="fit the camera to the lit set (F)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>Frame
+          </button>
+          <div class="zoom" title="zoom the chart — or pinch / ⌘-scroll over it; drag empty space to pan">
+            <button id="zoom-out" class="fbtn icon" type="button" aria-label="zoom out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 12h12" /></svg></button>
+            <button id="zoom-fit" class="fbtn" type="button" title="fit the whole chart in the panel">100%</button>
+            <button id="zoom-in" class="fbtn icon" type="button" aria-label="zoom in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 12h12M12 6v12" /></svg></button>
+          </div>
+          <button id="flow-dock" class="fbtn icon" type="button" title="dock back to the bottom (or double-click the header)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M4 15h16" /></svg></button>
+          <button id="flow-min" class="fbtn icon" title="collapse to an icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14" /></svg></button>
+        </div>
+      </header>
+      <div class="ftools">
+        <div class="seg sm" id="flow-mode" title="chart a concept's lineage, or build a set by hand"><button type="button" data-v="lineage">Lineage</button><button type="button" data-v="pick">Pick set</button></div>
+        <div class="seg sm" id="flow-scope">
+          <button type="button" data-v="both" title="the concept, everything it needs and everything that needs it">↕ Both</button>
+          <button type="button" data-v="down" title="the concept and everything it needs — its predecessors, all the way down">↓ Needs</button>
+          <button type="button" data-v="up" title="the concept and everything that needs it — its successors, up to the root">↑ Needed by</button>
+        </div>
+        <div id="pick-tools">
+          <button type="button" class="fbtn" id="pick-clear" title="empty the set and start again">Clear</button>
+          <span class="pt-none" id="pick-hint"></span>
+        </div>
+        <span id="flow-msg"></span>
+      </div>
+      <div id="flow-body"></div>
+      <footer><span>↑ arrow: prerequisite → the concept that needs it</span><span id="flow-click">click: focus</span><span>hover: find in 3D</span></footer>
+    </section>
+    <button id="flow-fab" type="button" aria-label="expand the lineage chart">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="5" r="2.4" /><circle cx="5.5" cy="18.5" r="2.4" /><circle cx="12" cy="18.5" r="2.4" /><circle cx="18.5" cy="18.5" r="2.4" /><path d="M12 7.4v8.7M10.4 6.9 6.6 16.3M13.6 6.9l3.8 9.4" /></svg>
+      <span class="n" id="fab-n"></span>
+    </button>
+    <div id="hover"></div>
+    <div id="help" class="panel">
+      <span>drag <b>rotate</b></span><span>scroll <b>zoom</b></span><span>right-drag <b>pan</b></span><span>click <b>focus</b></span>
+      <span><kbd>R</kbd> rotate</span><span><kbd>F</kbd> fit</span><span><kbd>Esc</kbd> reset</span>
+    </div>
+    <div id="error"></div>
+
+    <script type="module" src="/src/graph3d/main.js"></script>
+  </body>
+</html>
